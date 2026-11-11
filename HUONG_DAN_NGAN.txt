@@ -1,0 +1,9 @@
+1. MC: mở /mc.html → mật khẩu → Tạo phòng 1vs1 hoặc 5vs5.
+2. Gửi link /player.html và mã phòng cho học sinh.
+3. Học sinh nhập biệt danh → tìm phòng → chọn đội.
+4. MC duyệt → mở chọn tướng → bắt đầu trận.
+5. Kéo bên trái để đi, kéo sân để nhìn, bấm chiêu để đánh.
+6. Hạ đối thủ để lên cấp. Lên cấp/bị hạ thì trả lời Đúng/Sai.
+7. Cần tập trước: /trial/index.html. Sửa/tải nhân vật: /trial/models.html.
+
+Cài lên Render: xem README.md. Không bỏ mất thư mục khi tải lên GitHub.

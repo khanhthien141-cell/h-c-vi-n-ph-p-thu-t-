@@ -1,0 +1,10 @@
+import {createServer} from 'node:http';
+import {DatabaseSync} from 'node:sqlite';
+import fs from 'node:fs';
+import path from 'node:path';
+if(fs.existsSync('.env')&&process.loadEnvFile)process.loadEnvFile('.env');
+const worker=(await import('./dist/server/index.js')).default;
+const dir=process.env.DATA_DIR||'./data';fs.mkdirSync(dir,{recursive:true});const sqlite=new DatabaseSync(path.join(dir,'mila.sqlite'));sqlite.exec('PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS arcana_store (key TEXT PRIMARY KEY, value TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0);');
+const DB={prepare(sql){return{bind(...args){return{async first(){return sqlite.prepare(sql).get(...args)||null;},async all(){return{results:sqlite.prepare(sql).all(...args)};},async run(){const r=sqlite.prepare(sql).run(...args);return{meta:{changes:Number(r.changes)}};}};}};}};
+const args=process.argv.slice(2),portIndex=args.indexOf('--port');const port=Number(process.env.PORT||(portIndex>=0?args[portIndex+1]:3000));
+createServer(async(req,res)=>{try{const parts=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>2*1024*1024){res.writeHead(413);res.end('File quá lớn');return;}parts.push(chunk);}const headers=new Headers();for(const [key,value]of Object.entries(req.headers))if(value)headers.set(key,Array.isArray(value)?value.join(','):value);headers.set('CF-Connecting-IP',req.socket.remoteAddress||'local');const request=new Request('http://localhost:'+port+req.url,{method:req.method,headers,...(!['GET','HEAD'].includes(req.method)?{body:Buffer.concat(parts)}:{})});const response=await worker.fetch(request,{DB,HOST_PASSWORD:process.env.HOST_PASSWORD});res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));}catch{res.writeHead(500,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Máy chủ gặp lỗi. Hãy tải lại trang.'}));}}).listen(port,'0.0.0.0',()=>console.log('MILA ready on port '+port));
