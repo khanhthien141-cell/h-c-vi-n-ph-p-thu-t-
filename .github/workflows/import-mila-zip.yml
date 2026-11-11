@@ -1,0 +1,83 @@
+name: Import MILA game ZIP
+on:
+  push:
+    paths:
+      - 'MILA*.zip'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import-game:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract complete game safely
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path, PurePosixPath
+          from zipfile import ZipFile
+          import shutil, stat
+
+          archives = sorted(Path(".").glob("MILA*.zip"))
+          if not archives:
+              print("No MILA ZIP found; nothing to import.")
+              raise SystemExit(0)
+          if len(archives) != 1:
+              raise SystemExit("Please upload only one MILA ZIP at a time.")
+          archive = archives[0]
+          if archive.stat().st_size > 25 * 1024 * 1024:
+              raise SystemExit("ZIP is too large.")
+
+          with ZipFile(archive) as z:
+              infos = [i for i in z.infolist() if not i.is_dir()]
+              if sum(i.file_size for i in infos) > 80 * 1024 * 1024:
+                  raise SystemExit("Unpacked files exceed the size limit.")
+              roots = {PurePosixPath(i.filename).parts[0] for i in infos}
+              if len(roots) != 1 or not next(iter(roots)).startswith("MILA"):
+                  raise SystemExit("ZIP must contain one outer MILA game folder.")
+              selected = []
+              for info in infos:
+                  path = PurePosixPath(info.filename)
+                  if path.is_absolute() or ".." in path.parts or len(path.parts) < 2:
+                      raise SystemExit("Unsafe ZIP entry.")
+                  if stat.S_ISLNK(info.external_attr >> 16):
+                      raise SystemExit("Symbolic links are not allowed.")
+                  rel = Path(*path.parts[1:])
+                  if any(part in {".git", ".github", "node_modules", "data", "dist"} for part in rel.parts):
+                      continue
+                  if rel.name == ".env" or rel.suffix in {".pem", ".key"}:
+                      continue
+                  selected.append((info, rel))
+              present = {str(rel).replace("\\", "/") for _, rel in selected}
+              required = {
+                  "package.json", "server.js", "scripts/build.mjs",
+                  "public/player.html", "public/mc.html",
+                  "worker/index.js", "db/schema.ts"
+              }
+              missing = sorted(required - present)
+              if missing:
+                  raise SystemExit("Missing required game files: " + ", ".join(missing))
+
+              # An accidental placeholder named "db" currently blocks the db/ directory.
+              if Path("db").is_file():
+                  Path("db").unlink()
+              for info, rel in selected:
+                  destination = Path(rel)
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  with z.open(info) as src, destination.open("wb") as dst:
+                      shutil.copyfileobj(src, dst)
+              print(f"Imported {len(selected)} game files.")
+          archive.unlink()
+          PY
+      - name: Commit extracted game files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Import complete MILA game files from ZIP"
+            git push origin HEAD:main
+          fi
