@@ -1,0 +1,135 @@
+html{width:100%;height:100%;overflow:hidden}
+body{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;min-height:0!important;overflow:hidden!important;margin:0}
+#gameViewport{position:fixed;overflow:hidden;touch-action:pan-y;background:#e9e1ec}
+#gameViewport>#app{position:absolute!important;inset:0 auto auto 0!important;max-width:none!important;min-height:0!important;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;transform-origin:0 0!important}
+body.virtual-landscape{transform:none!important;left:0!important;top:0!important;width:100%!important;height:100%!important;overflow:hidden!important}
+body.virtual-landscape #app{max-width:none!important}
+body.virtual-landscape .entry{flex-direction:row;min-height:calc(var(--game-height) - 58px)}
+body.virtual-landscape .selection-layout{display:grid;flex-direction:row;height:calc(var(--game-height) - 106px);min-height:0}
+body.virtual-landscape .hero-grid{overflow:auto}
+body.virtual-landscape .welcome-character{display:block}
+body.virtual-landscape .waiting-layout{display:grid}
+body.virtual-landscape .slideshow{display:block}
+body.virtual-landscape .battle{position:fixed;inset:0}
+body.virtual-landscape .battle.spectator{position:relative}
+body.in-battle #app{overflow:hidden!important}
+.battle,.battle-stage{width:100%;height:100%;min-height:0!important}
+#arena{display:block;width:100%;height:100%;touch-action:none}
+.in-battle .battle-stage{position:absolute;inset:0}
+#host .battle-stage{position:relative;min-height:310px!important}
+.host-locked #app{visibility:hidden}
+.host-login{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;background:linear-gradient(140deg,#ebe2f3,#d3e9de);padding:20px}
+.host-login form{width:min(420px,95vw);padding:30px}
+.host-login input{width:100%;margin:14px 0}
+.crosshair{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff9;pointer-events:none;text-shadow:0 1px 3px #321d40;font-size:25px}
+.spectator .crosshair{display:none}
+.camera-switch{flex-wrap:wrap}
+.camera-switch select{min-width:160px;max-width:260px;flex:1}
+#rendererNotice{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);font-size:10px;background:#332542bb;color:white;border-radius:12px;padding:4px 10px;pointer-events:none}
+.spectator-focus{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:5;display:flex;gap:8px;align-items:center;padding:8px 14px;background:#31213ec9;color:#fff5e8;border:1px solid #edcf97;border-radius:16px;font-size:12px;max-width:90%;white-space:nowrap}
+.spectator-focus b{color:#fae2a8}
+.spectator-focus[hidden]{display:none}
+@media(max-width:420px){
+ body.virtual-landscape .entry{gap:15px}
+ body.virtual-landscape .entry-card{width:390px}
+ body.virtual-landscape .welcome-character{width:160px}
+ body.virtual-landscape .waiting-layout{grid-template-columns:140px 1fr 140px}
+ body.virtual-landscape .selection-layout{grid-template-columns:85px 1fr 145px}
+ body.virtual-landscape .hero-card img{height:55px}
+ body.virtual-landscape .hero-preview>img{height:82px}
+}
+@media(max-height:500px),(max-width:600px){
+ .entry{padding:10px;min-height:0}.entry-card{padding:14px}.entry-card h2{font-size:20px}
+ .entry-card label{margin:5px 0}.entry-card input,.entry-card select{padding:8px}
+ .topbar{height:48px;padding:5px 10px}.brand{font-size:24px}.brand span{font-size:19px}
+ .topbar h1{padding:6px 10px}.header-actions>span{padding:5px 8px}
+ .selection-layout{min-height:0}.hero-grid,.hero-preview{overflow:auto}
+ .quiz-card{max-height:88%;overflow:auto}.mini{width:82px;height:82px}
+ .battle-help{display:none}.match-score{min-width:0;max-width:60%;gap:7px;padding:6px 10px}
+ .match-score strong{font-size:18px}.match-score span{font-size:10px}
+ .knowledge{font-size:10px}.battle-brand{font-size:15px;padding:7px 10px}
+}
+@media(orientation:portrait) and (max-width:700px){
+ .entry{display:flex;flex-direction:column;justify-content:flex-start;gap:12px;padding:14px 12px 26px;min-height:0}
+ .welcome-character{display:none}.entry-card{width:min(100%,470px);padding:16px}
+ .selection{padding:8px}.select-top{padding:7px 10px;margin-bottom:6px}.select-top h2{font-size:16px}
+ .selection-layout{display:flex;flex-direction:column;gap:8px;height:auto}
+ .teammate-list{display:none}.hero-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:7px}
+ .hero-card img{height:68px}.hero-card b{font-size:12px}.hero-card small{font-size:9px}
+ .hero-preview{padding:8px}.hero-preview>img{height:95px}.hero-preview h2{font-size:17px}
+ .waiting-layout{grid-template-columns:1fr 1fr;gap:7px}.waiting-center{grid-column:1/-1;grid-row:1}
+ .waiting{padding:12px}.waiting-title{font-size:15px;padding:9px;margin-bottom:8px}
+ .waiting-member{margin:5px 0;padding:5px}.waiting-member img{width:38px;height:41px}
+ .waiting-team h2{font-size:14px}.slideshow{display:none}
+ .battle-brand,.knowledge{display:none}
+ .match-score{top:max(5px,env(safe-area-inset-top));width:calc(100% - 16px);max-width:calc(100% - 16px);min-width:0}
+ .match-score strong{font-size:clamp(14px,4vw,21px)}
+ .player-status{left:8px;right:8px;top:55px;bottom:auto;width:auto;max-width:none;min-height:46px;padding:5px 8px;gap:5px}
+ .player-status>img{width:43px;height:49px;margin:-4px 0}.level-badge{left:30px;bottom:-3px}
+ .player-status b{font-size:10px}.health-track{height:11px;margin-top:2px}.experience-track{height:5px}
+ .mini{left:8px;top:128px;width:94px;height:78px}
+ .view-controls{left:8px;top:218px;flex-direction:column}.view-controls button{font-size:11px}
+ .battle-settings{right:6px;top:125px;font-size:17px;padding:5px}
+ .joystick{left:10px;bottom:max(18px,env(safe-area-inset-bottom));width:118px;height:118px}
+ .joystick:before{font-size:100px}.joystick-knob{width:51px;height:51px}
+ .skill-controls{right:9px;bottom:max(17px,env(safe-area-inset-bottom));width:200px;height:182px}
+ .skill-controls .attack{width:78px;height:78px}.attack>span{font-size:37px}
+ .skill-one{left:0;bottom:67px;width:55px;height:55px}
+ .skill-two{left:54px;bottom:98px;width:55px;height:55px}
+ .skill-controls .ultimate{right:1px;top:0;width:65px;height:65px}
+ .ultimate small{display:none}
+ .skill-controls i:not(:empty){font-size:16px}
+ .respawn{top:34%;font-size:15px}
+ .quiz-backdrop{padding:10px}.quiz-card{width:100%;padding:14px}.quiz-card h2{font-size:18px}
+ .quiz-answers button{font-size:17px;padding:10px}
+ .modal{padding:8px}.modal-card{padding:15px;max-height:90dvh}
+}
+@media(max-height:420px) and (orientation:landscape){
+ .joystick{width:105px;height:105px;bottom:12px;left:10px}.joystick:before{font-size:95px}
+ .joystick-knob{width:48px;height:48px}
+ .skill-controls{right:8px;bottom:9px;transform:scale(.74);transform-origin:right bottom}
+ .player-status{left:29%;width:40%;bottom:8px;min-height:43px;padding:5px}
+ .player-status>img{width:45px;height:49px;margin:-8px 0}
+ .mini{width:76px;height:63px;top:62px}.view-controls{top:150px}
+ .battle-brand{display:none}.knowledge{display:none}
+}
+/* The permanent 3D gallery entry stays legible in real and simulated landscape. */
+.entry-links .open-3d-preview{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:42px;padding:10px 14px;border:1px solid #a57bb2;border-radius:13px;background:linear-gradient(135deg,#eee0fb,#d1c1ec);box-shadow:inset 0 0 0 2px #faf1ff,0 2px 0 #ac91ba;color:#644278;font-size:12px;font-weight:800;text-align:center}
+.entry-links .open-3d-preview:hover{filter:brightness(1.05)}
+.entry-links .open-3d-preview:focus-visible{outline:3px solid #745396;outline-offset:2px}
+@media(max-width:700px){.entry-links .open-3d-preview{padding:9px 10px;font-size:11px}}
+/* Native phone portrait: no transforms, no fake landscape. Controls always fit
+   within the physical touch viewport, including compact 320px screens. */
+@media(orientation:portrait) and (max-width:700px){
+ .entry-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+ .entry-links>*{flex:1 1 125px;text-align:center}
+ .selection{height:calc(var(--game-height) - 48px);overflow:auto;overscroll-behavior:contain}
+ .selection-layout{height:auto;overflow:visible;display:flex;flex-direction:column;gap:7px}
+ .hero-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:5px}
+ .hero-card{min-width:0;padding:4px 2px}
+ .hero-card img{height:54px;max-width:100%;object-fit:contain}
+ .hero-preview>img{height:76px;object-fit:contain}
+ .hero-preview h2{margin:3px 0;font-size:17px}
+ .hero-preview p{margin:4px 0;font-size:11px}
+ #previewSkills{margin:3px 0}
+ #confirmHero{padding:9px 10px}
+ .skill-controls,.joystick{touch-action:none}
+}
+@media(orientation:portrait) and (max-width:360px){
+ .match-score{top:4px;padding:5px 7px;gap:4px}
+ .match-score span{font-size:9px}.match-score strong{font-size:14px}
+ .player-status{top:47px;min-height:42px;padding:4px}
+ .player-status>img{height:43px;width:38px}
+ .mini{top:108px;left:6px;width:72px;height:66px}
+ .view-controls{top:183px;left:7px;gap:3px}
+ .battle-settings{top:109px;right:6px}
+ .joystick{left:8px;bottom:max(12px,env(safe-area-inset-bottom));width:98px;height:98px}
+ .joystick:before{font-size:87px}.joystick-knob{width:43px;height:43px}
+ .skill-controls{right:6px;bottom:max(12px,env(safe-area-inset-bottom));transform:scale(.78);transform-origin:right bottom}
+}
+@media(orientation:portrait) and (max-height:650px){
+ .mini{top:110px;height:60px}.view-controls{top:183px}
+ .joystick{bottom:10px}.skill-controls{bottom:10px}
+ .selection{height:calc(var(--game-height) - 48px)}
+ .hero-card img{height:46px}.hero-preview>img{height:66px}
+}
