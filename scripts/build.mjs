@@ -21,3 +21,4 @@ collect('dist');
 fs.mkdirSync('dist/server',{recursive:true});
 await build({entryPoints:['worker/index.js'],outfile:'dist/server/index.js',bundle:true,format:'esm',platform:'browser',minify:true,plugins:[{name:'local-assets',setup(b){b.onResolve({filter:/^arcana:assets$/},()=>({path:'assets',namespace:'arcana'}));b.onLoad({filter:/.*/,namespace:'arcana'},()=>({contents:JSON.stringify(assets),loader:'json'}));}}]});
 console.log('Built frontend, Node/Render assets and hosted Worker with DB.');
+
