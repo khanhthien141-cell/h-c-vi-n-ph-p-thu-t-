@@ -6,3 +6,5 @@ export function makeJoystick(element,onMove){let pointer=null;const knob=element
  function reset(){pointer=null;knob.style.transform='translate(0,0)';element.classList.remove('active');onMove({forward:0,right:0});}
  for(const name of ['pointerup','pointercancel','lostpointercapture'])element.addEventListener(name,e=>{if(e.pointerId===pointer)reset();});window.addEventListener('blur',reset);window.addEventListener('resize',reset);window.addEventListener('orientationchange',reset);return{reset};
 }
+
+export {bindSkillButtons} from '../joystick.js';

@@ -8,7 +8,7 @@ export function makeSocket(options){
  const request=async(path,body)=>{const res=await fetch(apiUrl(path),{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+options.auth.token},body:JSON.stringify(body||{})});const value=await res.json();if(!res.ok)throw Error(value.error||'Không kết nối được phòng.');return value;};
  const apply=p=>{if(p.room)phase=p.room.phase;if(p.room&&lastUI!==p.room.uiVersion){lastUI=p.room.uiVersion;fire('room',p.room);}if(p.match)fire('match',p.match);if(p.question){const key=p.question.index+':'+p.question.at+':'+p.question.reason;if(key!==lastQuiz){lastQuiz=key;fire('question',p.question);}}for(const chat of p.chats||[])if(!lastChats.has(chat.seq)){lastChats.add(chat.seq);fire('chat',chat);}if(lastChats.size>150)lastChats=new Set((p.chats||[]).map(c=>c.seq));};
  const poll=async()=>{if(closed||busy||!code)return;busy=true;const started=performance.now();try{// Keep a quick tap visible across at least one server simulation tick.
-  for(const skill of pendingTaps)tapExpires.set(skill,started+150);
+  for(const skill of pendingTaps)tapExpires.set(skill,started+220);
   pendingTaps.clear();
   const input={...latest};
   for(const [skill,expires] of tapExpires){

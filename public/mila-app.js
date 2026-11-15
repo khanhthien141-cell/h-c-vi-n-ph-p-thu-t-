@@ -8,7 +8,7 @@ import {heroes} from './shared/heroes.js';
 import {createMatch,step,botInput,scores,result as matchResult} from './shared/engine.js';
 import {pumpQuizzes,answerQuiz,publicQuiz} from './shared/quizzes.js';
 import {makeSocket} from './transport.js';
-import {makeJoystick} from './joystick.js';
+import {makeJoystick,bindSkillButtons} from './joystick.js';
 import {createArena} from './arena-3d.js';
 import QRCode from './vendor/qrcode.js';
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),asset=(h,kind='portraits')=>'/assets/mila/'+kind+'/'+h+'.webp';
@@ -28,7 +28,7 @@ if(!isHost){
  }
 }
 let roomInfo=null,auth=null,socket=null,room=null,match=null,selected='luna',quiz=null,quizAnswered=false,quizClosed=0,phase=null,practice=false,practiceBank=[],cameraMode=isHost?'overview':'follow',cameraSide=null,lastAutoWatch=0,autoWatchIndex=0;
-let joystick={forward:0,right:0},keys=new Set(),pressed=new Set(),skillTaps=new Set(),toastTimer,online=false,qrCode=null;
+let joystick={forward:0,right:0},keys=new Set(),pressed=new Set(),skillTaps=new Map(),toastTimer,online=false,qrCode=null;
 const arena=createArena($('#arena'));
 const titles={entry:'HỌC VIỆN PHÉP THUẬT',host:'BẢNG ĐIỀU KHIỂN QUẢN TRÒ',selection:'CHỌN NGƯỜI BẠN ĐỒNG HÀNH',waiting:'SẴN SÀNG VÀO ĐẤU TRƯỜNG',result:'VINH DANH NHÀ VÔ ĐỊCH'};
 const clock=n=>{n=Math.max(0,Math.ceil(n));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');};
@@ -149,20 +149,15 @@ checkOrientation();
 
 
 makeJoystick($('#joystick'),v=>joystick=v);
-for(const button of $$('[data-skill]')){
- const skill=Number(button.dataset.skill);
- button.addEventListener('pointerdown',event=>{
-  if(event.button!==0||!canUseBattleControls())return;
-  event.preventDefault();
-  button.setPointerCapture(event.pointerId);
+bindSkillButtons($$('[data-skill]'),{
+ canPress:canUseBattleControls,
+ onPress(skill){
   pressed.add(skill);
-  skillTaps.add(skill);
+  skillTaps.set(skill,performance.now()+220);
   if(!practice&&online)sendBattleInput();
- });
- for(const type of ['pointerup','pointercancel','lostpointercapture']){
-  button.addEventListener(type,()=>pressed.delete(skill));
- }
-}
+ },
+ onRelease(skill){pressed.delete(skill);}
+});
 window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||!$('#modal').hidden||!$('#heroDetail').hidden)return;if(['w','a','s','d','q','e','r',' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();keys.add(e.key.toLowerCase());}});window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();pressed.clear();skillTaps.clear();joystick={forward:0,right:0};});
 function canUseBattleControls(){
  return room?.phase==='battle'&&!room.paused&&!isHost&&
@@ -171,10 +166,25 @@ function canUseBattleControls(){
 function input(){if(!canUseBattleControls())return arena.view();const right=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0)+(joystick.right||0),down=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0)-(joystick.forward||0);return{...arena.view(),...arena.movement(-down,right),a0:pressed.has(0)||keys.has(' '),a1:pressed.has(1)||keys.has('q'),a2:pressed.has(2)||keys.has('e'),a3:pressed.has(3)||keys.has('r')};}
 function takeBattleInput(){
  const controls=input();
- const taps=canUseBattleControls()?[...skillTaps]:[];
- skillTaps.clear();
- if(!practice)return {...controls,skillTaps:taps};
- for(const skill of taps)controls['a'+skill]=true;
+ if(!canUseBattleControls()){
+  skillTaps.clear();
+  return controls;
+ }
+ const now=performance.now();
+ if(!practice){
+  const taps=[...skillTaps].filter(([,expires])=>expires>=now).map(([skill])=>skill);
+  skillTaps.clear();
+  return {...controls,skillTaps:taps};
+ }
+ const player=match?.players.find(p=>p.id===auth?.id);
+ for(const [skill,expires] of skillTaps){
+  if(!player||player.dead||expires<now||(skill===3&&!player.ultimate)){
+   skillTaps.delete(skill);
+  }else if(player.cd[skill]<=0){
+   controls['a'+skill]=true;
+   skillTaps.delete(skill);
+  }
+ }
  return controls;
 }
 function sendBattleInput(){
