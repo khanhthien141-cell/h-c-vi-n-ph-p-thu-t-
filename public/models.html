@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="vi">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+ <meta name="theme-color" content="#725383">
+ <meta name="description" content="Xem trước đủ 12 nhân vật 3D MILA khanitta, xoay 360 độ và so sánh với ảnh 2D gốc.">
+ <title>Xem trước nhân vật 3D · MILA khanitta</title>
+ <link rel="stylesheet" href="/models.css">
+</head>
+<body>
+ <header class="preview-header">
+  <a class="back-home" href="/">← Về Học viện</a>
+  <div class="preview-title"><span>✦ MILA khanitta ✦</span><h1>Phòng xem trước nhân vật 3D</h1><p>Chọn một trong 12 nhân vật · Đối chiếu với tranh gốc · Xoay ngắm mọi phía</p></div>
+  <span class="star" aria-hidden="true">✧</span>
+ </header>
+ <main class="preview-layout">
+  <aside class="preview-card reference-card">
+   <div class="label">✦ BẢN VẼ 2D GỐC</div>
+   <div class="reference">
+    <img id="reference" src="/assets/mila/portraits/luna.webp" alt="Ảnh minh họa gốc nhân vật đang chọn">
+    <div class="reference-info"><h2 id="name">Luna</h2><p id="desc">Pháp sư nguyệt quang</p></div>
+   </div>
+   <h3>CHỌN NHÂN VẬT</h3>
+   <div id="heroes" aria-label="Danh sách 12 nhân vật"></div>
+   <p class="note">✦ Đây là mô hình thật dùng trong trò chơi. Bạn có thể quan sát kỹ khuôn mặt, tóc, trang phục và vũ khí trước khi chọn.</p>
+  </aside>
+  <section class="preview-card model-card" aria-label="Khu vực xoay xem nhân vật 3D">
+   <div class="model-card-top"><div><span class="label">✧ MÔ HÌNH 3D</span><h2>Xoay nhân vật 360°</h2></div><span class="live-tag">12 / 12 NHÂN VẬT</span></div>
+   <div class="controls">
+    <button type="button" id="front">Mặt trước</button>
+    <button type="button" id="back">Sau lưng</button>
+    <button type="button" id="turn">⟳ Tự xoay</button>
+    <button type="button" id="walk">Chạy thử</button>
+    <button type="button" id="zoomIn" aria-label="Phóng to nhân vật">＋</button>
+    <button type="button" id="zoomOut" aria-label="Thu nhỏ nhân vật">−</button>
+   </div>
+   <div class="stage"><canvas id="view" aria-label="Mô hình 3D của nhân vật đã chọn"></canvas><p class="hint">Vuốt / kéo để xoay · Chụm hai ngón để phóng to</p></div>
+   <p id="status" class="note" role="status" aria-live="polite">Đang tải mô hình 3D…</p>
+   <a class="back-secondary" href="/">← Trở lại trò chơi</a>
+  </section>
+ </main>
+ <script type="module" src="/trial/model-room.js"></script>
+</body>
+</html>

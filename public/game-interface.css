@@ -1,0 +1,210 @@
+body[data-page="player"] {
+ --game-gold:#f7d697;
+ --game-lavender:#ead2ff;
+ --game-panel:linear-gradient(150deg,#332147f5,#1a122ce8 85%);
+ --game-edge:#c498ba91;
+}
+
+body[data-page="player"] #selection {
+ max-width:none;
+ width:100%;
+ min-height:calc(100dvh - 90px);
+ padding:clamp(12px,2vw,32px) max(14px,calc((100vw - 1480px) / 2));
+ color:#f8efff;
+ background:
+  linear-gradient(130deg,#221530e8,#211832d9),
+  url('/assets/mila/academy-entry.webp') center 50% / cover;
+}
+#selection :is(.select-top,.teammate-list,.hero-grid,.hero-preview) {
+ border:1px solid var(--game-edge);
+ border-radius:18px;
+ color:#f8efff;
+ background:var(--game-panel);
+ box-shadow:inset 0 0 0 3px #dfb8ec12,0 8px 22px #160a2359;
+}
+#selection .select-top {gap:10px;margin-bottom:12px;}
+#selection .select-top h2 {margin:0;color:var(--game-gold);}
+#selection .select-top > span {color:var(--game-lavender);}
+#selection .countdown {
+ background:#503367;
+ color:#ffe4ae;
+ border:1px solid #dfba86;
+ box-shadow:inset 0 0 0 3px #ead0f01a;
+ font-variant-numeric:tabular-nums;
+}
+#selection .selection-layout {
+ display:grid;
+ grid-template-columns:minmax(94px,.48fr) minmax(230px,1.45fr) minmax(270px,1.15fr);
+ gap:clamp(8px,1vw,16px);
+ align-items:start;
+}
+#selection .teammate-list {padding:10px;}
+#selection .teammate-list h3 {margin:2px 0 8px;color:var(--game-gold);}
+#selection .teammate {background:#6b4b7e55;color:#fff1fa;border:1px solid #b98ac85b;overflow-wrap:anywhere;}
+#selection .teammate small {color:var(--game-lavender);}
+#selection .hero-grid {
+ grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+ align-content:start;min-width:0;
+}
+#selection .hero-card {
+ min-width:0;
+ border:1px solid #78588e;
+ border-radius:12px;
+ background:radial-gradient(ellipse at 50% 37%,#705188,#38274c 80%);
+ color:#fff0fa;
+ box-shadow:inset 0 0 0 2px #ba9dca14;
+}
+#selection .hero-card small {color:#e8d3f4;}
+#selection .hero-card.chosen {
+ border-color:#ffdb93;
+ background:radial-gradient(ellipse at 48% 40%,#a977a5,#513464 75%);
+ box-shadow:inset 0 0 0 2px #ffda9777,0 0 13px #ffd58737;
+}
+#selection .hero-card:focus-visible,
+#selection .hero-preview button:focus-visible {outline:2px solid #ffe2a2;outline-offset:2px;}
+#selection .hero-preview {padding:clamp(8px,1.1vw,16px);min-width:0;}
+#selection .draft-name {margin-bottom:8px;}
+#selection .draft-name small {color:#eac8fc;}
+#selection .draft-name h2 {margin:2px 0;color:#ffe6ae;font-size:clamp(21px,2.7vw,34px);}
+#selection .draft-name p {margin:0;color:#ead7f5;}
+#selection .draft-views {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;}
+.draft-views figure {
+ position:relative;
+ isolation:isolate;
+ min-width:0;
+ display:grid;
+ grid-template-rows:auto 1fr;
+ margin:0;
+ padding:7px 4px 22px;
+ border:1px solid #be97cf88;
+ border-radius:12px;
+ background:
+  radial-gradient(ellipse at 50% 62%,#966caf64,transparent 62%),
+  linear-gradient(150deg,#4d3565,#2d2045);
+}
+.draft-views figure::before {
+ content:"";
+ position:absolute;
+ z-index:-1;
+ inset:auto 14% 13%;
+ height:15%;
+ border:1px solid #f9cf986b;
+ border-radius:50%;
+ box-shadow:0 0 14px #e4b4ff34,inset 0 0 10px #e4b4ff34;
+}
+.draft-views figcaption {font-size:clamp(10px,1vw,13px);font-weight:700;color:#ffdda7;}
+.draft-views img {
+ width:100%;
+ height:clamp(105px,23vw,260px);
+ object-fit:contain;
+ filter:drop-shadow(0 6px 6px #160e28a3);
+}
+#draftTurn {
+ position:absolute;
+ bottom:5px;
+ left:50%;
+ transform:translateX(-50%);
+ white-space:nowrap;
+ padding:3px 7px;
+ font-size:10px;
+ border:1px solid #b98acb;
+ background:#302143;
+ color:#f9eaff;
+ box-shadow:none;
+}
+#selection .draft-skills {display:flex;flex-wrap:wrap;align-items:center;gap:6px;justify-content:center;margin:7px 0;}
+#selection .preview-skills {margin:0;}
+#selection #draftDetails {
+ padding:5px 8px;
+ font-size:11px;
+ border:1px solid #b289c0;
+ background:#4e3564;
+ color:#f9eaff;
+ box-shadow:none;
+}
+#selection #confirmHero {
+ margin:0;
+ border:1px solid #ffe6ac;
+ color:#2c183d;
+ font-weight:800;
+ background:linear-gradient(135deg,#ffe5b3,#e5b8f7);
+ box-shadow:0 3px 0 #9469a4;
+}
+#selection #confirmHero:disabled {color:#e3fbe9;background:#386050;border-color:#86b99b;box-shadow:none;}
+#selection #selectionStatus {color:#e6cfec;}
+
+body[data-page="player"] .battle-hud :is(.battle-brand,.match-score,.mini,.knowledge,.player-status,.battle-settings,.view-controls button) {
+ color:#fff4f8;
+ border:1px solid #edbd82b0;
+ background:var(--game-panel);
+ box-shadow:inset 0 0 0 2px #cf9fb626,0 4px 14px #12081f7a;
+}
+body[data-page="player"] .battle-hud .battle-brand {color:var(--game-gold);}
+body[data-page="player"] .battle-hud .match-score {
+ background:linear-gradient(105deg,#553457f4 0%,#2b1e41f7 48%,#213d5cf5 100%);
+}
+body[data-page="player"] .battle-hud #killScore {color:#ffdfa9;font-variant-numeric:tabular-nums;}
+body[data-page="player"] .battle-hud #matchTime {color:#fff1cd;background:#33224bed;border-color:#c49e7c;}
+body[data-page="player"] .battle-hud .mini {padding:4px;}
+body[data-page="player"] .battle-hud .mini img {border-radius:inherit;filter:saturate(.9) contrast(1.06);}
+body[data-page="player"] .battle-hud .knowledge b {color:var(--game-gold);}
+body[data-page="player"] .battle-hud .player-status > img {border-color:#ffe1a5;background:#68507e;}
+body[data-page="player"] .battle-hud .health-track {outline:1px solid #b2d7b078;}
+body[data-page="player"] .battle-hud #hpFill {background:linear-gradient(90deg,#51b782,#a4e1a9);}
+body[data-page="player"] .battle-hud #xpFill {background:linear-gradient(90deg,#b681e2,#edd4ff);}
+body[data-page="player"] .battle-hud .joystick {
+ border:2px solid #f2cc9e95;
+ background:radial-gradient(#69538942,#332347a6);
+ box-shadow:inset 0 0 0 5px #edcbad23,0 5px 14px #160b2a61;
+}
+body[data-page="player"] .battle-hud .joystick-knob {
+ border:1px solid #ffdfae;
+ background:radial-gradient(circle at 36% 26%,#e9c7fa,#9172b6 64%,#573f72);
+}
+body[data-page="player"] .battle-hud .skill-controls button {
+ border-color:#ffda96;
+ background:radial-gradient(circle at 35% 28%,#a580bd,#492f66 69%,#2d2046);
+ box-shadow:inset 0 0 0 2px #ffe4bd4d,0 0 12px #b68cf27d,0 4px 12px #170a2f8a;
+}
+body[data-page="player"] .battle-hud .skill-controls button:active {
+ box-shadow:inset 0 0 0 3px #ffe9be,0 0 17px #f2d0bfb0;
+}
+body[data-page="player"] .battle-hud .skill-controls .locked {border-color:#b7a3c5;box-shadow:0 4px 10px #170a2f88;}
+@media (max-width:800px) and (orientation:portrait) {
+ #selection .selection-layout {grid-template-columns:1fr;}
+ #selection .hero-preview {grid-row:1;}
+ #selection .hero-card {padding:3px 1px;}
+ #selection .teammate-list {display:none;}
+ #selection .draft-views img {height:clamp(104px,26vw,175px);}
+ #selection .hero-grid {padding:8px;}
+ #selection .select-top {margin-bottom:8px;}
+ #selection .hero-card img {height:clamp(45px,11vw,74px);}
+}
+@media (orientation:landscape) and (max-height:600px) {
+ body[data-page="player"] #selection {min-height:calc(100dvh - 58px);padding:7px 10px;}
+ #selection .selection-layout {grid-template-columns:minmax(130px,.9fr) minmax(220px,1fr);gap:8px;}
+ #selection .teammate-list {display:none;}
+ #selection .hero-grid {gap:4px;padding:6px;}
+ #selection .hero-card {padding:2px 1px;}
+ #selection .hero-card img {height:clamp(28px,11dvh,64px);}
+ #selection .hero-card small {display:none;}
+ #selection .draft-views img {height:clamp(76px,30dvh,165px);}
+ #selection .draft-name {margin-bottom:4px;}
+ #selection .draft-name h2 {font-size:22px;}
+ #selection .draft-name p {font-size:10px;}
+ #selection .draft-skills {margin:5px 0;}
+ #selection .select-top {margin-bottom:6px;}
+}
+@media (max-width:700px) and (orientation:portrait) {
+ body[data-page="player"] #waiting .slideshow {display:block;}
+ body[data-page="player"] #waiting .slideshow img {height:clamp(126px,30dvh,220px);}
+}
+body[data-page="player"] .entry-links #practice {
+ color:#281837;
+ background:linear-gradient(135deg,#ffe7b7,#ebc3fa);
+ border-color:#ffe6b6;
+}
+body[data-page="player"] .header-actions #trialControl {width:auto;padding-inline:10px;white-space:nowrap;}
+@media (min-width:801px) and (min-height:601px) {
+ #selection .hero-card img {height:clamp(70px,14dvh,148px);}
+}
