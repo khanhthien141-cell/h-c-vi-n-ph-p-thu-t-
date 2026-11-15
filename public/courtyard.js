@@ -1,7 +1,7 @@
 import * as T from '/vendor/three.module.js';
 import {createAcademy} from './academy.js';
 import {mergeGeometries} from '/vendor/merge.js';
-export function createCourtyard(scene){
+export function createCourtyard(scene,{mobile=false}={}){
  const group=new T.Group();scene.add(group);const materials=new Map(),animated=[];let seed=419;
  const rnd=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;};
  function mat(c,glow=0){const key=c+':'+glow;if(!materials.has(key))materials.set(key,new T.MeshStandardMaterial({color:c,roughness:.85,metalness:0,emissive:c,emissiveIntensity:glow,side:T.DoubleSide}));return materials.get(key);}
@@ -26,7 +26,7 @@ export function createCourtyard(scene){
  // Open-book emblem with page lines and laurel leaves (geometry, not a flat background).
  for(const s of[-1,1]){const b=box(1.35,.025,1.9,'#b79460',s*.69,.06,0);b.rotation.y=s*.12;const p=box(1.19,.025,1.72,'#fff5dd',s*.68,.078,0);p.rotation.y=s*.12;for(let j=0;j<5;j++)line([[s*.18,.1,-.6+j*.27],[s*.65,.1,-.64+j*.27],[s*1.1,.1,-.55+j*.27]],'#d3b27a',.018);for(let j=0;j<7;j++){const a=-1.05+j*.32;const o=ball('#c2a367',s*(2+Math.cos(a)*.65),.07,Math.sin(a)*2,[.15,.022,.3]);o.rotation.y=s*(a+.9);}}
  // Rose beds are raised beyond the playable boundary, keeping movement unobstructed.
- const petalGeometry=new T.SphereGeometry(1,6,4);function flower(x,y,z,c,size=.18){for(let k=0;k<5;k++){const a=k*Math.PI*2/5;mesh(petalGeometry,c,x+Math.cos(a)*size*.6,y,z+Math.sin(a)*size*.6,[size*.55,.065,size*.55]);}mesh(petalGeometry,'#efcb71',x,y+.025,z,[size*.25,.05,size*.25]);}
+ const petalGeometry=new T.SphereGeometry(1,mobile?5:6,mobile?3:4);function flower(x,y,z,c,size=.18){for(let k=0;k<5;k++){const a=k*Math.PI*2/5;mesh(petalGeometry,c,x+Math.cos(a)*size*.6,y,z+Math.sin(a)*size*.6,[size*.55,.065,size*.55]);}mesh(petalGeometry,'#efcb71',x,y+.025,z,[size*.25,.05,size*.25]);}
  function bed(x,z,w=8,d=3){box(w+.35,.45,d+.35,'#ece1d5',x,.18,z);box(w,.12,d,'#658a5a',x,.42,z);for(let i=0;i<Math.floor(w*d*2);i++){const xx=x+(rnd()-.5)*(w-.3),zz=z+(rnd()-.5)*(d-.3);ball(['#6b9e69','#83b078','#91b67a'][i%3],xx,.65,zz,[.3,.3,.3]);flower(xx,.95+rnd()*.18,zz,['#fff3d9','#f4b9d5','#d3b1ed','#ffdcaa'][i%4],.16+rnd()*.1);}box(w+.4,.07,d+.4,'#d1ae79',x,.43,z);box(w,.08,d,'#679462',x,.48,z);}
  for(const z of[-24,24])for(const x of[-25,-11,11,25])bed(x,z,8,3);
  function bench(x,z,rot=0){const b=new T.Group();group.add(b);b.position.set(x,0,z);b.rotation.y=rot;function part(w,h,d,c,xx,yy,zz){const o=new T.Mesh(new T.BoxGeometry(w,h,d),mat(c));o.position.set(xx,yy,zz);b.add(o);}for(let j=0;j<3;j++){part(3.1,.12,.18,'#c7a374',0,.82,(j-1)*.23);part(3.1,.18,.1,'#e8c698',0,1.2+j*.21,-.35);}for(const s of[-1,1]){part(.14,.8,.65,'#b39b73',s*1.3,.4,0);part(.13,1.35,.12,'#c6a56d',s*1.5,1,-.34);part(.12,.1,.75,'#e5c08b',s*1.5,1.2,0);}}
