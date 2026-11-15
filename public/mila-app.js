@@ -3,7 +3,7 @@ import {ACADEMY_MAP} from '/shared/arena-layout.js';
 import {showHeroPreview,bindHeroDetails} from '/hero-picker.js';
 import {isVersus,teamSize,modeLabel,versusModes} from './shared/modes.js';
 import {createHeroSlideshow} from './shared/hero-slideshow.js';
-import {fitViewport,dismissLandscapePrompt} from '/viewport.js';
+import {fitViewport,enterMobileLandscape,bindLandscapeNotice} from '/viewport.js';
 import {heroes} from './shared/heroes.js';
 import {createMatch,step,botInput,scores,result as matchResult} from './shared/engine.js';
 import {pumpQuizzes,answerQuiz,publicQuiz} from './shared/quizzes.js';
@@ -100,7 +100,7 @@ function renderSelection(){const p=own(),h=hero(p?.heroReady?p.hero:selected),te
  for(const b of $$('.hero-card')){const taken=room.players.some(q=>q.team===team&&q.id!==p?.id&&!q.bot&&q.heroReady&&q.hero===b.dataset.hero);b.classList.toggle('chosen',b.dataset.hero===h.id);b.classList.toggle('taken',taken);b.setAttribute('aria-disabled',taken?'true':'false');}
  $('#teammates').innerHTML='<h3>ĐỒNG ĐỘI</h3>'+room.players.filter(q=>q.team===team).map(q=>`<div class="teammate"><img src="${asset(q.hero||'luna')}" alt=""><div>${esc(q.name)}<small>${q.heroReady?'✓ '+hero(q.hero).name:'Đang chọn…'}</small></div></div>`).join('');$('#confirmHero').disabled=!!p?.heroReady;$('#confirmHero').textContent=p?.heroReady?'✓ ĐÃ CHỐT':'✦ CHỐT NHÂN VẬT';$('#selectionStatus').textContent=p?.heroReady?'Đang chờ đồng đội chọn xong':'Hết giờ sẽ tự chọn tướng còn trống';
 }
-bind('confirmHero',async()=>{const r=await emit('selectHero',{hero:selected});if(r.room)updateRoom(r.room);});
+bind('confirmHero',async()=>{void enterMobileLandscape();const r=await emit('selectHero',{hero:selected});if(r.room)updateRoom(r.room);});
 function waitTeam(t){return`<h2>${esc(room.teams[t])}</h2>`+room.players.filter(p=>p.team===t).map(p=>`<div class="waiting-member"><img src="${asset(p.hero||'luna')}" alt="${p.hero?hero(p.hero).name:''}"><div><b>${esc(p.name)}</b><small>${!p.approved?'Chờ duyệt':p.heroReady?'✓ '+hero(p.hero).name:'Đã vào phòng'}</small></div></div>`).join('');}
 function renderWaiting(){if(isVersus(room.mode)&&!room.managed){$('.waiting-title').textContent='ĐẤU PHÉP THUẬT · '+modeLabel(room.mode);$('#waitingA').innerHTML=waitTeam(0);$('#waitingB').innerHTML=waitTeam(1);$('#waitingMessage').innerHTML='Mã phòng: <b>'+esc(room.code)+'</b><br>Đã có '+room.players.length+'/'+(teamSize(room.mode)*2)+' người. Đủ người sẽ tự mở chọn tướng.<br><button id=duelInvite>Sao chép link mời</button>';$('#duelInvite').onclick=run(async()=>{await navigator.clipboard.writeText(location.origin+'/player.html?mode='+room.mode+'&room='+room.code);toast('Đã sao chép link mời');});return;}$('.waiting-title').textContent=(room.phase==='ready'?'Hai đội đã sẵn sàng':'Hẹn nhau tại học viện')+' · '+modeLabel(room.mode);const pair=nextPair();$('#waitingA').innerHTML=waitTeam(pair[0]);$('#waitingB').innerHTML=waitTeam(pair[1]);const p=own();$('#waitingMessage').textContent=!p?.approved?'Chờ quản trò duyệt vào phòng…':room.phase==='ready'?'Hai đội đã chọn xong · Đợi quản trò bắt đầu trận…':!pair.includes(p.team)?'Đội bạn chờ vòng tiếp theo · Có thể xem trận đang đấu':'Đợi quản trò mở chọn tướng…';}
 $('#slideArt').addEventListener('click',()=>detail(slideshow.hero.id));
@@ -141,32 +141,12 @@ function chooseObserverMode(next){
 }
 $$('[data-camera]').forEach(b=>b.addEventListener('click',()=>chooseObserverMode(b.dataset.camera)));
 bind('broadcastFullscreen',async()=>{if($('.broadcast').requestFullscreen)await $('.broadcast').requestFullscreen();else toast('Trình duyệt chưa hỗ trợ toàn màn hình. Có thể trình chiếu trực tiếp trong tab.');});
-bind('fullscreen',async()=>{if(touchPlayer())await enterFullscreen();else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();else toast('Toàn màn hình không được hỗ trợ, vẫn chơi bình thường nhé!');});
+bind('fullscreen',async()=>{if(!isHost&&navigator.maxTouchPoints>0){void enterMobileLandscape();return;}await document.documentElement.requestFullscreen?.();});
 bind('cameraFollow',()=>{cameraMode=cameraMode==='follow'?'third':'follow';arena.camera(cameraMode);toast(cameraMode==='third'?'Nhìn sau lưng · Kéo sân để nhìn quanh':'Nhìn bằng mắt · Kéo sân để quay đầu');});bind('zoomPlus',()=>arena.zoom(.15));bind('zoomMinus',()=>arena.zoom(-.15));$('#mini').addEventListener('click',()=>{cameraMode=cameraMode==='overview'?'follow':'overview';arena.camera(cameraMode);});
-const touchPlayer=()=>!isHost&&navigator.maxTouchPoints>0;
-async function enterFullscreen(){
- // The browser decides whether orientation locking is supported. Never fake
- // landscape with CSS transforms: touch axes must stay aligned with the glass.
- try{if(!document.fullscreenElement&&document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();}catch{}
- let locked=false;
- if(touchPlayer())try{if(screen.orientation?.lock){await screen.orientation.lock('landscape');locked=true;}}catch{}
- checkOrientation();
- if(!locked&&innerHeight>innerWidth)toast('Hãy xoay ngang điện thoại. Nếu máy khóa xoay, hãy bật tự động xoay trong cài đặt nhanh.');
-}
 function checkOrientation(){fitViewport();}
-const orientationNotice=$('#orientation');
-if(orientationNotice){
- const skip=$('#ignoreOrientation');
- skip.textContent='Tiếp tục dọc nếu máy không xoay được';
- skip.addEventListener('click',()=>{dismissLandscapePrompt();toast('Đang dùng bố cục dọc dự phòng. Xoay ngang điện thoại khi có thể nhé!');});
- const prompt=orientationNotice.querySelector('p');
- if(prompt)prompt.textContent='Xoay ngang điện thoại để có góc nhìn rộng và các nút điều khiển đúng vị trí. Nếu máy đang khóa xoay, hãy bật Tự động xoay.';
- const button=document.createElement('button');button.id='tryLandscape';button.className='primary';button.textContent='⛶ Thử bật màn hình ngang';
- skip.before(button);button.addEventListener('click',run(enterFullscreen));
-}
-
-window.addEventListener('resize',checkOrientation);screen.orientation?.addEventListener?.('change',checkOrientation);
+bindLandscapeNotice();
 checkOrientation();
+
 
 makeJoystick($('#joystick'),v=>joystick=v);
 for(const b of $$('[data-skill]')){const k=+b.dataset.skill;b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);pressed.add(k);});for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,()=>pressed.delete(k));}

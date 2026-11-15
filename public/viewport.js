@@ -10,6 +10,47 @@ export function needsLandscapePrompt(layout,inBattle,isHost,dismissed=false){
 }
 let landscapeDismissed=false;
 export function dismissLandscapePrompt(){landscapeDismissed=true;fitViewport();}
+export function lockLandscape(orientation=globalThis.screen?.orientation) {
+ if (typeof orientation?.lock !== 'function') return Promise.resolve(false);
+ try { return Promise.resolve(orientation.lock('landscape')).then(()=>true,()=>false); }
+ catch { return Promise.resolve(false); }
+}
+
+let orientationRequest;
+export function enterMobileLandscape() {
+ // A real tap is needed by browsers that gate fullscreen on user activation.
+ const n=window.navigator;
+ if(document.body.dataset.page==='mc'||!(n.maxTouchPoints>0||matchMedia('(pointer: coarse)').matches))return;
+ if(orientationRequest)return orientationRequest;
+ const orientation=window.screen?.orientation;
+ if(!orientation?.lock)return;
+ const root=document.documentElement;
+ orientationRequest=(async()=>{
+  if(!document.fullscreenElement&&root.requestFullscreen){
+   try{await root.requestFullscreen();}catch{}
+  }
+  await lockLandscape(orientation);
+  fitViewport();
+ })().finally(()=>{orientationRequest=null;});
+ return orientationRequest;
+}
+
+export function bindLandscapeNotice() {
+ const notice=document.querySelector('#orientation');
+ if(!notice)return;
+ notice.querySelector('h2').textContent='Xoay ngang để nhìn rộng hơn';
+ const skip=notice.querySelector('#ignoreOrientation');
+ skip.textContent='×';
+ skip.setAttribute('aria-label','Ẩn nhắc xoay màn hình');
+ skip.addEventListener('click',dismissLandscapePrompt);
+ if(window.screen?.orientation?.lock){
+  const button=document.createElement('button');
+  button.type='button';button.id='tryLandscape';button.textContent='Xoay ngang';
+  button.addEventListener('click',enterMobileLandscape);
+  skip.before(button);
+ }
+}
+
 let scheduled=false;
 export function fitViewport(){
  const app=document.querySelector('#app');
@@ -41,6 +82,7 @@ export function fitViewport(){
 }
 function scheduleFit(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;fitViewport();});}
 for(const event of ['resize','orientationchange','focusin','pageshow'])window.addEventListener(event,scheduleFit);
+document.addEventListener('fullscreenchange',scheduleFit);
 window.addEventListener('focusout',()=>setTimeout(scheduleFit,140));
 window.visualViewport?.addEventListener('resize',scheduleFit);
 window.visualViewport?.addEventListener('scroll',scheduleFit);

@@ -159,3 +159,23 @@ body.in-battle #app{overflow:hidden!important}
  .selection{height:calc(var(--game-height) - 48px)}
  .hero-card img{height:46px}.hero-preview>img{height:66px}
 }
+
+/* Phones that stay vertical can play immediately while the hint is visible. */
+body.in-battle #orientation.orientation {
+ inset:104px auto auto 50%;
+ transform:translateX(-50%);
+ z-index:7;
+ width:max-content;
+ max-width:calc(100% - 22px);
+ padding:6px 8px;
+ gap:6px;
+ flex-direction:row;
+ flex-wrap:wrap;
+ border:1px solid #d0ac85;
+ border-radius:10px;
+ background:#261c35e8;
+ backdrop-filter:none;
+}
+body.in-battle #orientation.orientation > :is(b,p) {display:none;}
+body.in-battle #orientation.orientation h2 {font:600 11px system-ui;margin:0;}
+body.in-battle #orientation.orientation button {width:auto;min-height:34px;margin:0;padding:4px 8px;font-size:11px;}

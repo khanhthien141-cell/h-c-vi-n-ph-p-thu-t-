@@ -5,11 +5,19 @@ import {createHeroModel} from './hero-models.js';
 import {customization} from './shared/customization.js';
 import {heroes} from './shared/heroes.js';
 import {cameraPose} from './shared/camera.js';
+function mobileGraphicsSettings(device, pixelRatio=1) {
+ const touch=device.maxTouchPoints>0;
+ const modest=touch&&(device.deviceMemory<=4||device.hardwareConcurrency<=4);
+ return {
+  touch,
+  maxDpr:Math.min(pixelRatio||1,touch?(modest ? .9 : 1.1):1.6),
+  minDpr:Math.min(pixelRatio||1,modest ? .60 : touch ? .68 : .85),
+  antialias:!touch
+ };
+}
 export function makeScene(canvas,cameraState){
- const touch=navigator.maxTouchPoints>0;
- const modestPhone=touch&&((navigator.deviceMemory??6)<=4||(navigator.hardwareConcurrency??8)<=4);
- const maxDpr=Math.min(window.devicePixelRatio||1,touch?(modestPhone?1:1.2):1.6),minDpr=modestPhone ? .6 : touch ? .72 : .85;
- let renderer;try{renderer=new T.WebGLRenderer({canvas,antialias:!modestPhone,alpha:true,powerPreference:'high-performance'});}catch{throw Error('Thiết bị chưa bật WebGL. Hãy bật tăng tốc đồ họa của trình duyệt.');}
+ const {touch,maxDpr,minDpr,antialias}=mobileGraphicsSettings(navigator,globalThis.devicePixelRatio);
+ let renderer;try{renderer=new T.WebGLRenderer({canvas,antialias,alpha:true,powerPreference:'high-performance'});}catch{throw Error('Thiết bị chưa bật WebGL. Hãy bật tăng tốc đồ họa của trình duyệt.');}
  renderer.setPixelRatio(maxDpr);renderer.shadowMap.enabled=!touch;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.setClearColor('#c0d6e8',1);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
  const scene=new T.Scene();scene.fog=new T.FogExp2('#c0d6e8',.0045);const camera=new T.PerspectiveCamera(48,1,.1,220);
  scene.add(new T.HemisphereLight('#c9e8ff','#aca0bb',2.0));const sun=new T.DirectionalLight('#fff0dc',2.6);sun.position.set(-20,35,12);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-45,right:45,top:30,bottom:-30});scene.add(sun);
