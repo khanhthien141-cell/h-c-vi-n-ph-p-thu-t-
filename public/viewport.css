@@ -179,3 +179,26 @@ body.in-battle #orientation.orientation {
 body.in-battle #orientation.orientation > :is(b,p) {display:none;}
 body.in-battle #orientation.orientation h2 {font:600 11px system-ui;margin:0;}
 body.in-battle #orientation.orientation button {width:auto;min-height:34px;margin:0;padding:4px 8px;font-size:11px;}
+
+/* Keep the actual hit targets full size on touch screens, including landscape. */
+@media (pointer:coarse) {
+ body.in-battle[data-page="player"] .battle-hud .skill-controls {
+  width:196px;
+  height:165px;
+  right:max(9px,env(safe-area-inset-right));
+  bottom:max(10px,env(safe-area-inset-bottom));
+  transform:none;
+ }
+ body.in-battle .battle-hud .skill-controls button {
+  touch-action:none;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;
+ }
+ .skill-controls button img,.skill-controls button span,.skill-controls button small {pointer-events:none;}
+ body.in-battle .battle-hud .skill-controls .attack {width:76px;height:76px;right:0;bottom:0;}
+ body.in-battle .battle-hud .skill-controls .skill-one {width:56px;height:56px;left:0;bottom:55px;}
+ body.in-battle .battle-hud .skill-controls .skill-two {width:56px;height:56px;left:59px;bottom:101px;}
+ body.in-battle .battle-hud .skill-controls .ultimate {width:64px;height:64px;right:0;top:0;}
+}
