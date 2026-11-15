@@ -36,7 +36,9 @@ const faceStyles={
  zephyr:{iris:'#41a4cf',skin:'#ffe7d8'}
 };
 function batchMobileHero(root,pivots){
- const material=new T.MeshLambertMaterial({vertexColors:true,side:T.DoubleSide});
+ const material=new T.MeshPhongMaterial({
+  vertexColors:true,side:T.DoubleSide,shininess:22,specular:'#444052'
+ });
  root.updateMatrixWorld(true);
  const localMatrix=new T.Matrix4();
  for(const pivot of pivots){
@@ -49,11 +51,15 @@ function batchMobileHero(root,pivots){
     geometry.deleteAttribute('uv');
     const count=geometry.attributes.position.count;
     const shading=child.material.vertexColors?geometry.attributes.color:null;
-    const rgb=child.material.color,colors=new Float32Array(count*3);
+    const finish=child.material,normal=geometry.attributes.normal;
+    const rgb=finish.color,colors=new Float32Array(count*3);
     for(let index=0;index<count;index++){
-     colors[index*3]=rgb.r*(shading?shading.getX(index):1);
-     colors[index*3+1]=rgb.g*(shading?shading.getY(index):1);
-     colors[index*3+2]=rgb.b*(shading?shading.getZ(index):1);
+     // Bake a soft highlight into gold, steel and crystals before batching.
+     const highlight=finish.metalness*.24*Math.max(0,.45*normal.getX(index)+.75*normal.getY(index)+.48*normal.getZ(index));
+     const glow=finish.emissiveIntensity*.14;
+     colors[index*3]=rgb.r*((shading?shading.getX(index):1)+glow)+highlight;
+     colors[index*3+1]=rgb.g*((shading?shading.getY(index):1)+glow)+highlight*.88;
+     colors[index*3+2]=rgb.b*((shading?shading.getZ(index):1)+glow)+highlight*.67;
     }
     geometry.setAttribute('color',new T.BufferAttribute(colors,3));
     if(!geometry.index){
@@ -256,7 +262,7 @@ export function createHeroModel(id,{merge=true,mobile=false}={}){
  {
   const profile=y=>1-.16*Math.max(0,-y/.52)+.03*Math.exp(-Math.pow((y+.12)/.16,2));
   const faceDepth=(x,y)=>.475*Math.sqrt(Math.max(0,1-(y/.52)**2-(x/(.55*profile(y)))**2));
-  const face=new T.SphereGeometry(1,mobile?24:40,mobile?16:28),vertices=face.attributes.position;
+  const face=new T.SphereGeometry(1,mobile?28:40,mobile?18:28),vertices=face.attributes.position;
   for(let i=0;i<vertices.count;i++){
    const y=vertices.getY(i)*.52;
    vertices.setXYZ(i,vertices.getX(i)*.55*profile(y),y,vertices.getZ(i)*.475);
@@ -299,7 +305,7 @@ export function createHeroModel(id,{merge=true,mobile=false}={}){
   const shortHair=!d.long;
   const sweep={sol:.36,ivy:-.21,kai:.31,ember:.49,nova:-.28,sage:.14,
    raven:-.31,atlas:-.40,faye:.19,milo:.27,zephyr:.41,luna:-.32}[id]||0;
-  const locks=shortHair?13:15,bands=mobile?19:33,segments=locks*(mobile?6:12);
+  const locks=shortHair?13:15,bands=mobile?21:33,segments=locks*(mobile?7:12);
   const points=[],colors=[],indices=[];
   for(let row=0;row<=bands;row++){
    const v=row/bands,tip=Math.pow(v,6);

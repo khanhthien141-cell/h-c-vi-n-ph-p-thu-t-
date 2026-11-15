@@ -15,15 +15,46 @@ function mobileGraphicsSettings(device, pixelRatio=1) {
   antialias:!touch
  };
 }
+function createContactShadows(scene){
+ const size=32,pixels=new Uint8Array(size*size*4);
+ for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+  const radius=Math.min(1,Math.hypot(2*(x+.5)/size-1,2*(y+.5)/size-1));
+  const i=(y*size+x)*4;
+  pixels.set([46,30,55,Math.round(142*(1-radius*radius)**2)],i);
+ }
+ const texture=new T.DataTexture(pixels,size,size);
+ texture.colorSpace=T.SRGBColorSpace;
+ texture.magFilter=texture.minFilter=T.LinearFilter;
+ texture.needsUpdate=true;
+ const geometry=new T.PlaneGeometry(2.4,1.85).rotateX(-Math.PI/2);
+ const material=new T.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1});
+ const capacity=24,shadow=new T.InstancedMesh(geometry,material,capacity),matrix=new T.Matrix4();
+ shadow.count=0;shadow.frustumCulled=false;
+ shadow.instanceMatrix.setUsage(T.DynamicDrawUsage);
+ scene.add(shadow);
+ return{
+  update(players,hiddenId){
+   let count=0;
+   for(const p of players){
+    if(p.dead||p.id===hiddenId||count===capacity)continue;
+    shadow.setMatrixAt(count++,matrix.makeTranslation(p.x,.042,p.z));
+   }
+   shadow.count=count;
+   if(count)shadow.instanceMatrix.needsUpdate=true;
+  },
+  destroy(){shadow.removeFromParent();shadow.dispose();geometry.dispose();material.dispose();texture.dispose();}
+ };
+}
 export function makeScene(canvas,cameraState){
  const {touch,maxDpr,minDpr,antialias}=mobileGraphicsSettings(navigator,globalThis.devicePixelRatio);
  let renderer;try{renderer=new T.WebGLRenderer({canvas,antialias,alpha:true,powerPreference:'high-performance'});}catch{throw Error('Thiết bị chưa bật WebGL. Hãy bật tăng tốc đồ họa của trình duyệt.');}
  const startDpr=touch?Math.min(maxDpr,.85):maxDpr;
  renderer.setPixelRatio(startDpr);renderer.shadowMap.enabled=!touch;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.setClearColor('#c0d6e8',1);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
  const scene=new T.Scene();scene.fog=new T.FogExp2('#c0d6e8',.0045);const camera=new T.PerspectiveCamera(48,1,.1,220);
- scene.add(new T.HemisphereLight('#c9e8ff','#aca0bb',2.0));const sun=new T.DirectionalLight('#fff0dc',2.6);sun.position.set(-20,35,12);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-45,right:45,top:30,bottom:-30});scene.add(sun);
+ scene.add(new T.HemisphereLight('#c9e8ff','#aca0bb',touch?1.7:2.0));const sun=new T.DirectionalLight('#fff0dc',touch?2.85:2.6);sun.position.set(-20,35,12);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-45,right:45,top:30,bottom:-30});scene.add(sun);
  const ambient=new T.PointLight('#a68cff',70,50);ambient.position.set(0,8,-4);scene.add(ambient);
- const courtyard=createCourtyard(scene);
+ const courtyard=createCourtyard(scene,{mobile:touch});
+ const contactShadows=touch?createContactShadows(scene):null;
  let lastAnimationTime=0,frameAverage=1/60,qualityAt=0,renderDpr=startDpr;
  const actors=new Map(),spellFX=createSpellFX(scene,{mobile:touch});let mode='lobby',focus=null,theme=-1;
  function character(p){
@@ -45,6 +76,7 @@ export function makeScene(canvas,cameraState){
  const v=new T.Vector3(),look=new T.Vector3(),smoothLook=new T.Vector3(),barRotation=new T.Quaternion(),inverseActor=new T.Quaternion();let cameraReady=false;
  function render(m,id,t){const animationDelta=Math.min(.1,Math.max(0,t-lastAnimationTime));lastAnimationTime=t;if(animationDelta>0){frameAverage+=(Math.min(.09,animationDelta)-frameAverage)*.06;if(t-qualityAt>(touch ? .85 : 1.8)){const next=frameAverage>.036?Math.max(minDpr,renderDpr-.19):frameAverage>.027?Math.max(minDpr,renderDpr-.12):frameAverage<.02?Math.min(maxDpr,renderDpr+.055):renderDpr;if(Math.abs(next-renderDpr)>.015){renderDpr=next;renderer.setPixelRatio(renderDpr);}qualityAt=t;}}resize();courtyard.update(t);const desired=new Set(m?.players?.map(p=>p.id)||[]);for(const key of actors.keys())if(!desired.has(key))removeActor(key);if(m){if(theme!==m.round&&m.round!==undefined){theme=m.round;scene.fog.color.set(['#c0d6e8','#d9c8e3','#c3deda'][theme%3]);renderer.setClearColor(scene.fog.color);}
  focus=m.players.find(p=>p.id===id)||m.players[0];
+ contactShadows?.update(m.players,cameraState.firstPerson&&mode==='battle'?id:null);
  spellFX.update(m,t,mode==='battle'&&cameraState.firstPerson?{player:focus,yaw:cameraState.yaw}:null);
  for(const p of m.players){
   let a=actors.get(p.id);
@@ -62,5 +94,5 @@ export function makeScene(canvas,cameraState){
  a.userData.animate(t,a.userData.speed,spellFX.castPose(p.id)||(attacking?Math.max(0,Math.sin(t*18)):0));}}
  if(mode==='battle'&&focus){const pose=cameraPose(cameraState,focus);v.set(...pose.position);look.set(...pose.target);}else if(mode==='spectate'){v.set(32,65,56);look.set(0,2,-3);}else{v.set(37,36,42);look.set(0,0,0);}const alpha=cameraState.firstPerson&&mode==='battle'?1:1-Math.exp(-20*animationDelta);if(!cameraReady||camera.position.distanceTo(v)>20){camera.position.copy(v);smoothLook.copy(look);cameraReady=true;}else{camera.position.lerp(v,alpha);smoothLook.lerp(look,alpha);}camera.lookAt(smoothLook);
  renderer.render(scene,camera);}
- return{render,setMode(v){mode=v;},destroy(){for(const id of actors.keys())removeActor(id);spellFX.destroy();renderer.dispose();}};
+ return{render,setMode(v){mode=v;},destroy(){for(const id of actors.keys())removeActor(id);contactShadows?.destroy();spellFX.destroy();renderer.dispose();}};
 }
