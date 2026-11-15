@@ -1,0 +1,22 @@
+MILA khanitta 2.1
+
+CHƠI ONLINE
+Học sinh: /player.html
+Quản trò: /mc.html
+Xem nhân vật: /trial/models.html
+
+MC tạo phòng → gửi mã → duyệt học sinh → mở chọn tướng → bắt đầu.
+Học sinh chỉ nhập biệt danh, mã phòng và chọn đội.
+
+TỰ CHẠY SERVER
+Cài Node.js 24. Mở terminal trong thư mục này:
+npm ci
+npm run build
+Sao chép .env.example thành .env, đặt HOST_PASSWORD.
+npm start
+Mở http://localhost:3000/player.html
+
+Đưa lên GitHub: giữ nguyên thư mục, không tải riêng từng file bên trong.
+Render: Web Service; build npm ci && npm run build; start npm start.
+Đặt HOST_PASSWORD trong Environment.
+Xem README.md để lưu dữ liệu lâu dài và chỉnh nhân vật/nhạc.

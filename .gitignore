@@ -1,0 +1,7 @@
+node_modules/
+data/
+dist/
+*.zip
+*.tar.gz
+.env
+dist-assets/
