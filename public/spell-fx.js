@@ -1,10 +1,11 @@
 import * as T from '/vendor/three.module.js';
 import { buildSpell, SPELL_BOOK, SPELL_DURATION, PREVIEW_REACH, ULTIMATE_OFFSET } from './spell-sequences.js';
 export const SPELL_STYLES={sol:{color:'#ffbb43',light:'#fff2ab',shape:'sun'},luna:{color:'#a766eb',light:'#e4bdff',shape:'moon'},ivy:{color:'#40b978',light:'#d6ffb8',shape:'leaf'},kai:{color:'#308fe5',light:'#b0eeff',shape:'arrow'},ember:{color:'#ff5c33',light:'#ffd258',shape:'fire'},nova:{color:'#b76eef',light:'#ffe2fc',shape:'star'},sage:{color:'#60aa47',light:'#d7f18f',shape:'leaf'},raven:{color:'#8a4bc1',light:'#e4a3f4',shape:'arrow'},atlas:{color:'#7299da',light:'#ffe4ab',shape:'stone'},faye:{color:'#e86db4',light:'#ffd0f0',shape:'star'},milo:{color:'#55bb99',light:'#ffe5a0',shape:'note'},zephyr:{color:'#44c7ce',light:'#d1ffff',shape:'wind'}};
-export function createSpellFX(scene,{sequencesOnly=false}={}){
+export function createSpellFX(scene,{sequencesOnly=false,mobile=false}={}){
  const root=new T.Group();root.name='spell-effects';scene.add(root);const dummy=new T.Object3D(),color=new T.Color();
- const particles=new T.InstancedMesh(new T.OctahedronGeometry(1,0),new T.MeshBasicMaterial({transparent:true,opacity:.85,depthWrite:false,toneMapped:false}),320);particles.instanceMatrix.setUsage(T.DynamicDrawUsage);particles.frustumCulled=false;particles.count=0;root.add(particles);
- const motes=Array.from({length:320},()=>({life:0}));let moteIndex=0,seed=12345;const rand=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;};
+ const particleLimit=mobile?112:320;
+ const particles=new T.InstancedMesh(new T.OctahedronGeometry(1,0),new T.MeshBasicMaterial({transparent:true,opacity:.85,depthWrite:false,toneMapped:false}),particleLimit);particles.instanceMatrix.setUsage(T.DynamicDrawUsage);particles.frustumCulled=false;particles.count=0;root.add(particles);
+ const motes=Array.from({length:particleLimit},()=>({life:0}));let moteIndex=0,seed=12345;const rand=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;};
  const material=()=>new T.MeshBasicMaterial({transparent:true,opacity:.8,depthWrite:false,side:T.DoubleSide,toneMapped:false});
  const ringGeo=new T.TorusGeometry(1,.025,5,40),arcGeo=new T.TorusGeometry(1,.07,5,28,Math.PI*1.35),orbGeo=new T.IcosahedronGeometry(.17,1),shieldGeo=new T.SphereGeometry(1,12,8);
  const glyphs={};const starShape=new T.Shape();for(let i=0;i<10;i++){const a=i*Math.PI/5+Math.PI/2,r=i%2?.18:.42;i?starShape.lineTo(Math.cos(a)*r,Math.sin(a)*r):starShape.moveTo(Math.cos(a)*r,Math.sin(a)*r);}starShape.closePath();glyphs.star=new T.ShapeGeometry(starShape);glyphs.sun=glyphs.star;glyphs.moon=new T.TorusGeometry(.3,.07,6,24,Math.PI*1.5);glyphs.wind=new T.TorusGeometry(.3,.025,6,24,Math.PI*1.7);const leaf=new T.Shape();leaf.moveTo(0,-.35);leaf.quadraticCurveTo(-.4,.08,0,.4);leaf.quadraticCurveTo(.4,.08,0,-.35);glyphs.leaf=new T.ShapeGeometry(leaf);const note=new T.Shape();note.absellipse(-.1,-.15,.16,.1,0,Math.PI*2,false,0);note.moveTo(.02,-.15);note.lineTo(.02,.4);note.lineTo(.3,.29);note.lineTo(.3,.18);note.lineTo(.09,.28);note.lineTo(.09,-.15);glyphs.note=new T.ShapeGeometry(note);
@@ -57,9 +58,10 @@ export function createSpellFX(scene,{sequencesOnly=false}={}){
   const dx=(target?.tx??e.x)-e.x,dz=(target?.tz??e.z)-e.z;
   const reach=Math.hypot(dx,dz);
   // Quantize only the visual distance. The server still computes the actual hit.
-  const distance=reach>.15?Math.round(reach*4)/4:PREVIEW_REACH;
+  const precision=mobile?2:4;
+  const distance=reach>.15?Math.round(reach*precision)/precision:PREVIEW_REACH;
   const key=e.hero+':'+e.kind+':'+distance;
-  const spell=spareSpells.get(key)||buildSpell(e.hero,e.kind,distance);
+  const spell=spareSpells.get(key)||buildSpell(e.hero,e.kind,distance,1,{mobile});
   spareSpells.delete(key);
   const yaw=reach>.15?Math.atan2(-dz,dx):(e.facing??Math.PI/2)-Math.PI/2;
   const offset=e.kind===3?ULTIMATE_OFFSET:0;

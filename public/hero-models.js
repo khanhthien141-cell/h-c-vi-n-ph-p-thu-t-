@@ -35,7 +35,46 @@ const faceStyles={
  milo:{iris:'#5a9663',skin:'#ffe2ce'},
  zephyr:{iris:'#41a4cf',skin:'#ffe7d8'}
 };
-export function createHeroModel(id,{merge=true}={}){
+function batchMobileHero(root,pivots){
+ const material=new T.MeshLambertMaterial({vertexColors:true,side:T.DoubleSide});
+ root.updateMatrixWorld(true);
+ const localMatrix=new T.Matrix4();
+ for(const pivot of pivots){
+  const inverse=pivot.matrixWorld.clone().invert(),parts=[],objects=[];
+  function collect(parent){
+   for(const child of parent.children){
+    if(pivots.has(child))continue;
+    if(!child.isMesh){collect(child);continue;}
+    const geometry=child.geometry.clone().applyMatrix4(localMatrix.multiplyMatrices(inverse,child.matrixWorld));
+    geometry.deleteAttribute('uv');
+    const count=geometry.attributes.position.count;
+    const shading=child.material.vertexColors?geometry.attributes.color:null;
+    const rgb=child.material.color,colors=new Float32Array(count*3);
+    for(let index=0;index<count;index++){
+     colors[index*3]=rgb.r*(shading?shading.getX(index):1);
+     colors[index*3+1]=rgb.g*(shading?shading.getY(index):1);
+     colors[index*3+2]=rgb.b*(shading?shading.getZ(index):1);
+    }
+    geometry.setAttribute('color',new T.BufferAttribute(colors,3));
+    if(!geometry.index){
+     const indices=count>65535?new Uint32Array(count):new Uint16Array(count);
+     for(let index=0;index<count;index++)indices[index]=index;
+     geometry.setIndex(new T.BufferAttribute(indices,1));
+    }
+    parts.push(geometry);
+    objects.push(child);
+   }
+  }
+  collect(pivot);
+  if(!parts.length)continue;
+  const geometry=mergeGeometries(parts);
+  for(const part of parts)part.dispose();
+  if(!geometry)continue;
+  for(const object of objects)object.removeFromParent();
+  pivot.add(new T.Mesh(geometry,material));
+ }
+}
+export function createHeroModel(id,{merge=true,mobile=false}={}){
  const d=designs[id]||designs.luna,root=new T.Group();root.name=id;
  const faceStyle=faceStyles[id]||faceStyles.luna;
  const irisColor=new T.Color(faceStyle.iris);
@@ -44,13 +83,27 @@ export function createHeroModel(id,{merge=true}={}){
  const mats={};for(const [k,color]of Object.entries({hair:d.hair,hairLight:mixed(d.hair,'#ffefdf',.28),hairShadow:mixed(d.hair,'#30263b',.2),coat:d.coat,coatShadow:mixed(d.coat,'#2e2342',.23),silk:mixed(d.accent,'#fff7df',.55),accent:d.accent,eye:faceStyle.iris,eyeLight,skin:faceStyle.skin,cream:'#fff4dd',gold:'#dca94b',goldLight:'#ffe0a0',dark:'#352335',white:'#fffaf4',blush:'#ef9b9f',steel:'#d5d8e7',wood:'#6f4733',crystal:mixed(faceStyle.iris,'#ffffff',.24),pearl:'#fff6e7'}))mats[k]=new T.MeshStandardMaterial({color,roughness:['gold','goldLight'].includes(k)?.30:['hair','hairLight','eye','eyeLight','silk','crystal'].includes(k)?.47:k==='skin'?.68:.75,metalness:['gold','goldLight'].includes(k)?.47:k==='steel'?.5:k==='crystal'?.14:0,emissive:k==='crystal'||k==='eyeLight'?color:'#000000',emissiveIntensity:k==='crystal'?.45:k==='eyeLight'?.14:0,side:T.DoubleSide});
  const body=new T.Group(),head=new T.Group(),cape=new T.Group(),arms=[],legs=[];body.name='Body';head.name='Head';cape.name='Cape';root.add(body);body.add(head,cape);head.position.y=2.28;
  function mesh(parent,geo,mat,pos=[0,0,0],scale=[1,1,1]){const m=new T.Mesh(geo,mats[mat]||mat);m.position.set(...pos);m.scale.set(...scale);m.castShadow=true;parent.add(m);return m;}
- const sphere=new T.SphereGeometry(1,24,16);
+ const sphere=new T.SphereGeometry(1,mobile?12:24,mobile?8:16);
  const ell=(p,m,pos,s)=>mesh(p,sphere,m,pos,s);
- function curve(p,pts,r,mat,end=.3){const c=new T.CatmullRomCurve3(pts.map(V)),geo=new T.TubeGeometry(c,Math.max(12,pts.length*5),1,7,false),a=geo.attributes.position,n=geo.attributes.normal;for(let i=0;i<a.count;i++){const ring=Math.floor(i/8),t=ring/Math.max(12,pts.length*5),center=c.getPointAt(t),radius=mat==='hair'?r*(.3+.8*Math.pow(Math.sin(Math.PI*t),.55))*(1-t*.7):r*(1-(1-end)*t);a.setXYZ(i,center.x+(a.getX(i)-center.x)*radius,center.y+(a.getY(i)-center.y)*radius,center.z+(a.getZ(i)-center.z)*radius*(mat==='hair'?.55:1));}geo.computeVertexNormals();return mesh(p,geo,mat);}
+ function curve(p,pts,r,mat,end=.3){
+  const c=new T.CatmullRomCurve3(pts.map(V));
+  const steps=mobile?Math.max(8,pts.length*3):Math.max(12,pts.length*5),sides=mobile?5:7;
+  const geo=new T.TubeGeometry(c,steps,1,sides,false),a=geo.attributes.position;
+  for(let row=0;row<=steps;row++){
+   const t=row/steps,center=c.getPointAt(t);
+   const radius=mat==='hair'?r*(.3+.8*Math.sin(Math.PI*t)**.55)*(1-t*.7):r*(1-(1-end)*t);
+   for(let col=0;col<=sides;col++){
+    const index=row*(sides+1)+col;
+    a.setXYZ(index,center.x+(a.getX(index)-center.x)*radius,center.y+(a.getY(index)-center.y)*radius,center.z+(a.getZ(index)-center.z)*radius*(mat==='hair'?.55:1));
+   }
+  }
+  geo.computeVertexNormals();
+  return mesh(p,geo,mat);
+ }
  // Closed, softly tapered locks with roots embedded in the scalp.
  function hairLock(parent,points,width,material='hair'){
   const path=new T.CatmullRomCurve3(points.map(V));
-  const steps=16,sides=12;
+  const steps=mobile?10:16,sides=mobile?8:12;
   const geometry=new T.TubeGeometry(path,steps,1,sides,false);
   const position=geometry.attributes.position;
   for(let row=0;row<=steps;row++){
@@ -70,7 +123,7 @@ export function createHeroModel(id,{merge=true}={}){
  function strip(p,rows,mat){const a=[],uv=[],idx=[];rows.forEach((r,i)=>{for(let j=0;j<2;j++){a.push(...r[j]);uv.push(j,i/(rows.length-1));}if(i){let n=i*2;idx.push(n-2,n-1,n,n-1,n+1,n);}});const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(a,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();return mesh(p,g,mat);}
  function star(p,x,y,z,r=.13,mat='gold',points=5){const shape=new T.Shape();for(let i=0;i<points*2;i++){const a=i*Math.PI/points+Math.PI/2,q=i%2?r*.43:r;const px=x+Math.cos(a)*q,py=y+Math.sin(a)*q;i?shape.lineTo(px,py):shape.moveTo(px,py);}shape.closePath();return mesh(p,new T.ExtrudeGeometry(shape,{depth:.035,bevelEnabled:true,bevelSegments:1,steps:1,bevelSize:.014,bevelThickness:.012}),mat,[0,0,z]);}
  function gem(p,x,y,z,r=.12,mat='accent'){return mesh(p,new T.OctahedronGeometry(r,0),mat,[x,y,z],[.8,1.35,.6]);}
- function ring(p,x,y,z,r=.12,mat='gold',tube=.018){return mesh(p,new T.TorusGeometry(r,tube,6,28),mat,[x,y,z]);}
+ function ring(p,x,y,z,r=.12,mat='gold',tube=.018){return mesh(p,new T.TorusGeometry(r,tube,mobile?4:6,mobile?14:28),mat,[x,y,z]);}
  function flower(p,x,y,z,s=.12){for(let i=0;i<5;i++){const a=i*TAU/5;ell(p,'cream',[x+Math.cos(a)*s*.7,y+Math.sin(a)*s*.7,z],[s*.6,s*.6,.038]);}ell(p,'gold',[x,y,z+.04],[s*.35,s*.35,.04]);}
  function leaf(p,pts,r=.1,mat='accent'){return curve(p,pts,r,mat,.02);}
  function pearls(p,pts,r=.025,mat='pearl'){for(const pt of pts)ell(p,mat,pt,[r,r,r]);}
@@ -203,7 +256,7 @@ export function createHeroModel(id,{merge=true}={}){
  {
   const profile=y=>1-.16*Math.max(0,-y/.52)+.03*Math.exp(-Math.pow((y+.12)/.16,2));
   const faceDepth=(x,y)=>.475*Math.sqrt(Math.max(0,1-(y/.52)**2-(x/(.55*profile(y)))**2));
-  const face=new T.SphereGeometry(1,40,28),vertices=face.attributes.position;
+  const face=new T.SphereGeometry(1,mobile?24:40,mobile?16:28),vertices=face.attributes.position;
   for(let i=0;i<vertices.count;i++){
    const y=vertices.getY(i)*.52;
    vertices.setXYZ(i,vertices.getX(i)*.55*profile(y),y,vertices.getZ(i)*.475);
@@ -246,7 +299,7 @@ export function createHeroModel(id,{merge=true}={}){
   const shortHair=!d.long;
   const sweep={sol:.36,ivy:-.21,kai:.31,ember:.49,nova:-.28,sage:.14,
    raven:-.31,atlas:-.40,faye:.19,milo:.27,zephyr:.41,luna:-.32}[id]||0;
-  const locks=shortHair?13:15,bands=33,segments=locks*12;
+  const locks=shortHair?13:15,bands=mobile?19:33,segments=locks*(mobile?6:12);
   const points=[],colors=[],indices=[];
   for(let row=0;row<=bands;row++){
    const v=row/bands,tip=Math.pow(v,6);
@@ -304,7 +357,7 @@ export function createHeroModel(id,{merge=true}={}){
   for(const [index,{points,width,depth,steps=24}] of hairPaths.entries()){
    const path=new T.CatmullRomCurve3(points.map(V));
    const edgeShade=(index===0||index===hairPaths.length-1) ? .90 : 1;
-   const segments=steps,sides=24;
+   const segments=mobile?Math.max(10,Math.ceil(steps*.6)):steps,sides=mobile?12:24;
    const surface=new T.TubeGeometry(path,segments,1,sides,false);
    const positions=surface.attributes.position,colors=[];
    for(let row=0;row<=segments;row++){
@@ -334,7 +387,7 @@ export function createHeroModel(id,{merge=true}={}){
   // in the same S-curves separate highlights from the shadowed underlayer.
   function curl(points,width,depth,material){
    const path=new T.CatmullRomCurve3(points.map(V));
-   const segments=28,sides=12,frame=path.computeFrenetFrames(segments,false);
+   const segments=mobile?16:28,sides=mobile?8:12,frame=path.computeFrenetFrames(segments,false);
    const geometry=new T.TubeGeometry(path,segments,1,sides,false);
    const position=geometry.attributes.position;
    for(let i=0;i<=segments;i++){
@@ -580,7 +633,8 @@ export function createHeroModel(id,{merge=true}={}){
  if(d.weapon==='book'){weapon.position.y+=.3;for(const s of[-1,1]){const page=mesh(weapon,new T.BoxGeometry(.3,.38,.055),'coat',[s*.15,.17,.2]);page.rotation.y=-s*.35;const pages=mesh(weapon,new T.BoxGeometry(.27,.34,.04),'cream',[s*.15,.17,.16]);pages.rotation.y=-s*.35;star(weapon,s*.15,.17,.24,.09);}}
  if(d.weapon==='lute'){const lute=new T.Group();body.add(lute);lute.position.set(0,1.4,.34);lute.rotation.z=-.5;ell(lute,'gold',[0,-.1,0],[.26,.34,.065]);ell(lute,'wood',[0,.04,.062],[.07,.08,.012]);mesh(lute,new T.BoxGeometry(.09,.55,.055),'wood',[0,.4,0]);for(let j=-2;j<=2;j++)curve(lute,[[j*.013,-.27,.078],[j*.013,.67,.06]],.003,'cream',1);}
  // Merge by material inside each animation pivot, reducing draw calls without freezing limbs.
- if(merge){const pivots=new Set([head,cape,...arms,...legs,body]);for(const group of pivots){group.updateWorldMatrix(true,true);const inverse=group.matrixWorld.clone().invert(),byMat=new Map();function collect(node){for(const o of node.children){if(pivots.has(o))continue;if(o.isMesh){if(!byMat.has(o.material))byMat.set(o.material,[]);byMat.get(o.material).push(o);}else collect(o);}}collect(group);for(const [mat,objects]of byMat){const geos=objects.map(o=>{const g=o.geometry.clone().applyMatrix4(inverse.clone().multiply(o.matrixWorld));g.deleteAttribute('uv');return g.index?g.toNonIndexed():g;});const geo=mergeGeometries(geos,false);if(geo){objects.forEach(o=>o.removeFromParent());mesh(group,geo,mat);}geos.forEach(g=>g.dispose());}}}
+ if(merge&&mobile)batchMobileHero(root,new Set([head,cape,...arms,...legs,body]));
+ else if(merge){const pivots=new Set([head,cape,...arms,...legs,body]);for(const group of pivots){group.updateWorldMatrix(true,true);const inverse=group.matrixWorld.clone().invert(),byMat=new Map();function collect(node){for(const o of node.children){if(pivots.has(o))continue;if(o.isMesh){if(!byMat.has(o.material))byMat.set(o.material,[]);byMat.get(o.material).push(o);}else collect(o);}}collect(group);for(const [mat,objects]of byMat){const geos=objects.map(o=>{const g=o.geometry.clone().applyMatrix4(inverse.clone().multiply(o.matrixWorld));g.deleteAttribute('uv');return g.index?g.toNonIndexed():g;});const geo=mergeGeometries(geos,false);if(geo){objects.forEach(o=>o.removeFromParent());mesh(group,geo,mat);}geos.forEach(g=>g.dispose());}}}
 
  let walk=0;
  root.userData={id,design:d,body,head,arms,legs,cape,animate(t,speed=0,attack=0){walk+=(Math.min(speed,8)*.95+.1)*.016;const step=Math.sin(t*9),amount=Math.min(1,speed/3);body.position.y=Math.abs(step)*.055*amount;legs[0].rotation.x=step*.55*amount;legs[1].rotation.x=-step*.55*amount;arms[0].rotation.x=-step*.2*amount;arms[1].rotation.x=step*.2*amount-attack*.65;head.rotation.z=Math.sin(t*1.5)*.015;cape.rotation.x=-.06-amount*.11+Math.sin(t*3)*.025;}};
