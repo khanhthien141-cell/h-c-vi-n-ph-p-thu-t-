@@ -28,7 +28,7 @@ export function phaseAt(elapsed, duration) {
   return t < .27 ? [0,t/.27] : t < .70 ? [1,(t-.27)/.43] : [2,(t-.70)/.30];
 }
 
-export function buildSpell(hero, slot, reach=4.5, direction=1) {
+export function buildSpell(hero, slot, reach=4.5, direction=1, {mobile=false}={}) {
   const [base,highlight,spells] = SPELL_BOOK[hero];
   const [name,kind] = spells[slot-1];
   const root = new T.Group();
@@ -49,7 +49,7 @@ export function buildSpell(hero, slot, reach=4.5, direction=1) {
   }
   const bright = surface(highlight,.97), vivid=surface(base,.88), sheen=surface(base,.34,true), glass=surface(highlight,.25,true);
   const wood=surface('#98704d',.96), rock=surface('#555877',.97);
-  const core = new T.OctahedronGeometry(1), orb=new T.SphereGeometry(1,20,12);
+  const core = new T.OctahedronGeometry(1), orb=new T.SphereGeometry(1,mobile?12:20,mobile?8:12);
   const box=new T.BoxGeometry(1,1,1), cone=new T.ConeGeometry(1,1,10);
   for(const geometry of [core,orb,box,cone])resources.add(geometry);
   function mesh(parent,geometry,material,x=0,y=0,z=0,scale=[1,1,1]) {
@@ -59,7 +59,7 @@ export function buildSpell(hero, slot, reach=4.5, direction=1) {
     return object;
   }
   function ring(parent,r,x=0,y=.07,z=0,mat=bright,flat=true,span=TAU) {
-    const geometry=new T.TorusGeometry(r,.025,6,52,span);
+    const geometry=new T.TorusGeometry(r,.025,mobile?4:6,mobile?26:52,span);
     resources.add(geometry);
     const item=mesh(parent,geometry,mat,x,y,z);
     if(flat)item.rotation.x=-Math.PI/2;
@@ -67,7 +67,7 @@ export function buildSpell(hero, slot, reach=4.5, direction=1) {
   }
   function path(parent,points,thick,mat=bright) {
     const curve=new T.CatmullRomCurve3(points.map(p=>new T.Vector3(...p)));
-    const geometry=new T.TubeGeometry(curve,Math.max(14,points.length*5),thick,6,false);
+    const geometry=new T.TubeGeometry(curve,mobile?Math.max(8,points.length*2):Math.max(14,points.length*5),thick,mobile?4:6,false);
     resources.add(geometry);
     return mesh(parent,geometry,mat);
   }
@@ -75,7 +75,7 @@ export function buildSpell(hero, slot, reach=4.5, direction=1) {
   // A ribbon is a curved mesh with a moving bright core and soft edges.
   function ribbon(parent,points,width,phase,roll=0) {
     const curve=new T.CatmullRomCurve3(points.map(p=>new T.Vector3(...p)));
-    const positions=[],uvs=[],triangles=[],segments=36;
+    const positions=[],uvs=[],triangles=[],segments=mobile?16:36;
     const normal=new T.Vector3(Math.sin(roll),Math.cos(roll),.46);
     for(let i=0;i<=segments;i++){
       const t=i/segments,position=curve.getPointAt(t),tangent=curve.getTangentAt(t);
@@ -173,6 +173,7 @@ export function buildSpell(hero, slot, reach=4.5, direction=1) {
     return path(parent,points,.038,mat);
   }
   function shards(parent,count,spread,height,x=0,mat=bright) {
+    if(mobile)count=Math.ceil(count*.42);
     const burst=new T.InstancedMesh(core,mat,count);
     const transform=new T.Object3D();
     burst.frustumCulled=false;

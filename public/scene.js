@@ -25,18 +25,36 @@ export function makeScene(canvas,cameraState){
  const ambient=new T.PointLight('#a68cff',70,50);ambient.position.set(0,8,-4);scene.add(ambient);
  const courtyard=createCourtyard(scene);
  let lastAnimationTime=0,frameAverage=1/60,qualityAt=0,renderDpr=startDpr;
- const actors=new Map(),spellFX=createSpellFX(scene);let mode='lobby',focus=null,theme=-1;
+ const actors=new Map(),spellFX=createSpellFX(scene,{mobile:touch});let mode='lobby',focus=null,theme=-1;
  function character(p){
- const h=heroes.find(h=>h.id===p.hero)||heroes[0],g=createHeroModel(h.id);
+ const h=heroes.find(h=>h.id===p.hero)||heroes[0],g=createHeroModel(h.id,{mobile:touch});
  const ring=new T.Mesh(new T.TorusGeometry(.82,.035,8,36),new T.MeshBasicMaterial({color:p.team%2?'#dbb7ff':'#b0e9ce'}));ring.rotation.x=Math.PI/2;ring.position.y=.08;g.add(ring);
  const bar=new T.Mesh(new T.PlaneGeometry(1.3,.07),new T.MeshBasicMaterial({color:'#91d9b0',side:T.DoubleSide}));bar.position.y=3.95;g.add(bar);
  Object.assign(g.userData,{h,bar,lastX:p.x,lastZ:p.z,speed:0});scene.add(g);actors.set(p.id,g);return g;}
+ function removeActor(id){
+  const actor=actors.get(id),geometries=new Set(),materials=new Set();
+  actor.traverse(object=>{
+   if(object.isMesh){geometries.add(object.geometry);materials.add(object.material);}
+  });
+  for(const geometry of geometries)geometry.dispose();
+  for(const material of materials)material.dispose();
+  actor.removeFromParent();
+  actors.delete(id);
+ }
  let previousW=0,previousH=0;function resize(){const w=canvas.clientWidth,h=canvas.clientHeight;if(w&&h&&(w!==previousW||h!==previousH)){previousW=w;previousH=h;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}}new ResizeObserver(resize).observe(canvas);
  const v=new T.Vector3(),look=new T.Vector3(),smoothLook=new T.Vector3(),barRotation=new T.Quaternion(),inverseActor=new T.Quaternion();let cameraReady=false;
- function render(m,id,t){const animationDelta=Math.min(.1,Math.max(0,t-lastAnimationTime));lastAnimationTime=t;if(animationDelta>0){frameAverage+=(Math.min(.09,animationDelta)-frameAverage)*.06;if(t-qualityAt>(touch ? .85 : 1.8)){const next=frameAverage>.036?Math.max(minDpr,renderDpr-.19):frameAverage>.027?Math.max(minDpr,renderDpr-.12):frameAverage<.02?Math.min(maxDpr,renderDpr+.055):renderDpr;if(Math.abs(next-renderDpr)>.015){renderDpr=next;renderer.setPixelRatio(renderDpr);}qualityAt=t;}}resize();courtyard.update(t);const desired=new Set(m?.players?.map(p=>p.id)||[]);for(const [key,a]of actors)if(!desired.has(key)){scene.remove(a);actors.delete(key);}if(m){if(theme!==m.round&&m.round!==undefined){theme=m.round;scene.fog.color.set(['#c0d6e8','#d9c8e3','#c3deda'][theme%3]);renderer.setClearColor(scene.fog.color);}
+ function render(m,id,t){const animationDelta=Math.min(.1,Math.max(0,t-lastAnimationTime));lastAnimationTime=t;if(animationDelta>0){frameAverage+=(Math.min(.09,animationDelta)-frameAverage)*.06;if(t-qualityAt>(touch ? .85 : 1.8)){const next=frameAverage>.036?Math.max(minDpr,renderDpr-.19):frameAverage>.027?Math.max(minDpr,renderDpr-.12):frameAverage<.02?Math.min(maxDpr,renderDpr+.055):renderDpr;if(Math.abs(next-renderDpr)>.015){renderDpr=next;renderer.setPixelRatio(renderDpr);}qualityAt=t;}}resize();courtyard.update(t);const desired=new Set(m?.players?.map(p=>p.id)||[]);for(const key of actors.keys())if(!desired.has(key))removeActor(key);if(m){if(theme!==m.round&&m.round!==undefined){theme=m.round;scene.fog.color.set(['#c0d6e8','#d9c8e3','#c3deda'][theme%3]);renderer.setClearColor(scene.fog.color);}
  focus=m.players.find(p=>p.id===id)||m.players[0];
  spellFX.update(m,t,mode==='battle'&&cameraState.firstPerson?{player:focus,yaw:cameraState.yaw}:null);
- for(const p of m.players){let a=actors.get(p.id);if(a&&a.userData.h.id!==p.hero){scene.remove(a);actors.delete(p.id);a=null;}a=a||character(p);a.visible=!p.dead&&!(cameraState.firstPerson&&mode==='battle'&&p.id===id);
+ for(const p of m.players){
+  let a=actors.get(p.id);
+  if(a&&a.userData.h.id!==p.hero){removeActor(p.id);a=null;}
+  if(p.dead||(cameraState.firstPerson&&mode==='battle'&&p.id===id)){
+   if(a)a.visible=false;
+   continue;
+  }
+  a=a||character(p);
+  a.visible=true;
  const speed=Math.min(10,Math.hypot(p.x-a.userData.lastX,p.z-a.userData.lastZ)/Math.max(.001,animationDelta));a.userData.speed+=(speed-a.userData.speed)*(1-Math.exp(-12*animationDelta));a.userData.lastX=p.x;a.userData.lastZ=p.z;
  a.position.set(p.x,0,p.z);const targetAngle=Number.isFinite(p.facing)?p.facing:m.pair?.indexOf(p.team)===1?-Math.PI/2:Math.PI/2;const angleDelta=Math.atan2(Math.sin(targetAngle-a.rotation.y),Math.cos(targetAngle-a.rotation.y));a.rotation.y+=angleDelta*(1-Math.exp(-20*animationDelta));
  a.userData.bar.scale.x=Math.max(.01,p.hp/a.userData.h.hp);inverseActor.copy(a.quaternion).invert();barRotation.copy(camera.quaternion).premultiply(inverseActor);a.userData.bar.quaternion.copy(barRotation);
@@ -44,5 +62,5 @@ export function makeScene(canvas,cameraState){
  a.userData.animate(t,a.userData.speed,spellFX.castPose(p.id)||(attacking?Math.max(0,Math.sin(t*18)):0));}}
  if(mode==='battle'&&focus){const pose=cameraPose(cameraState,focus);v.set(...pose.position);look.set(...pose.target);}else if(mode==='spectate'){v.set(32,65,56);look.set(0,2,-3);}else{v.set(37,36,42);look.set(0,0,0);}const alpha=cameraState.firstPerson&&mode==='battle'?1:1-Math.exp(-20*animationDelta);if(!cameraReady||camera.position.distanceTo(v)>20){camera.position.copy(v);smoothLook.copy(look);cameraReady=true;}else{camera.position.lerp(v,alpha);smoothLook.lerp(look,alpha);}camera.lookAt(smoothLook);
  renderer.render(scene,camera);}
- return{render,setMode(v){mode=v;},destroy(){spellFX.destroy();renderer.dispose();}};
+ return{render,setMode(v){mode=v;},destroy(){for(const id of actors.keys())removeActor(id);spellFX.destroy();renderer.dispose();}};
 }
