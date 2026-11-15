@@ -18,12 +18,13 @@ function mobileGraphicsSettings(device, pixelRatio=1) {
 export function makeScene(canvas,cameraState){
  const {touch,maxDpr,minDpr,antialias}=mobileGraphicsSettings(navigator,globalThis.devicePixelRatio);
  let renderer;try{renderer=new T.WebGLRenderer({canvas,antialias,alpha:true,powerPreference:'high-performance'});}catch{throw Error('Thiết bị chưa bật WebGL. Hãy bật tăng tốc đồ họa của trình duyệt.');}
- renderer.setPixelRatio(maxDpr);renderer.shadowMap.enabled=!touch;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.setClearColor('#c0d6e8',1);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
+ const startDpr=touch?Math.min(maxDpr,.85):maxDpr;
+ renderer.setPixelRatio(startDpr);renderer.shadowMap.enabled=!touch;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.setClearColor('#c0d6e8',1);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
  const scene=new T.Scene();scene.fog=new T.FogExp2('#c0d6e8',.0045);const camera=new T.PerspectiveCamera(48,1,.1,220);
  scene.add(new T.HemisphereLight('#c9e8ff','#aca0bb',2.0));const sun=new T.DirectionalLight('#fff0dc',2.6);sun.position.set(-20,35,12);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-45,right:45,top:30,bottom:-30});scene.add(sun);
  const ambient=new T.PointLight('#a68cff',70,50);ambient.position.set(0,8,-4);scene.add(ambient);
  const courtyard=createCourtyard(scene);
- let lastAnimationTime=0,frameAverage=1/60,qualityAt=0,renderDpr=maxDpr;
+ let lastAnimationTime=0,frameAverage=1/60,qualityAt=0,renderDpr=startDpr;
  const actors=new Map(),spellFX=createSpellFX(scene);let mode='lobby',focus=null,theme=-1;
  function character(p){
  const h=heroes.find(h=>h.id===p.hero)||heroes[0],g=createHeroModel(h.id);
@@ -32,7 +33,7 @@ export function makeScene(canvas,cameraState){
  Object.assign(g.userData,{h,bar,lastX:p.x,lastZ:p.z,speed:0});scene.add(g);actors.set(p.id,g);return g;}
  let previousW=0,previousH=0;function resize(){const w=canvas.clientWidth,h=canvas.clientHeight;if(w&&h&&(w!==previousW||h!==previousH)){previousW=w;previousH=h;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}}new ResizeObserver(resize).observe(canvas);
  const v=new T.Vector3(),look=new T.Vector3(),smoothLook=new T.Vector3(),barRotation=new T.Quaternion(),inverseActor=new T.Quaternion();let cameraReady=false;
- function render(m,id,t){const animationDelta=Math.min(.1,Math.max(0,t-lastAnimationTime));lastAnimationTime=t;if(animationDelta>0&&animationDelta<.09){frameAverage+=(animationDelta-frameAverage)*.04;if(t-qualityAt>1.8){const next=frameAverage>.036?Math.max(minDpr,renderDpr-.19):frameAverage>.027?Math.max(minDpr,renderDpr-.12):frameAverage<.02?Math.min(maxDpr,renderDpr+.055):renderDpr;if(Math.abs(next-renderDpr)>.015){renderDpr=next;renderer.setPixelRatio(renderDpr);}qualityAt=t;}}resize();courtyard.update(t);const desired=new Set(m?.players?.map(p=>p.id)||[]);for(const [key,a]of actors)if(!desired.has(key)){scene.remove(a);actors.delete(key);}if(m){if(theme!==m.round&&m.round!==undefined){theme=m.round;scene.fog.color.set(['#c0d6e8','#d9c8e3','#c3deda'][theme%3]);renderer.setClearColor(scene.fog.color);}
+ function render(m,id,t){const animationDelta=Math.min(.1,Math.max(0,t-lastAnimationTime));lastAnimationTime=t;if(animationDelta>0){frameAverage+=(Math.min(.09,animationDelta)-frameAverage)*.06;if(t-qualityAt>(touch ? .85 : 1.8)){const next=frameAverage>.036?Math.max(minDpr,renderDpr-.19):frameAverage>.027?Math.max(minDpr,renderDpr-.12):frameAverage<.02?Math.min(maxDpr,renderDpr+.055):renderDpr;if(Math.abs(next-renderDpr)>.015){renderDpr=next;renderer.setPixelRatio(renderDpr);}qualityAt=t;}}resize();courtyard.update(t);const desired=new Set(m?.players?.map(p=>p.id)||[]);for(const [key,a]of actors)if(!desired.has(key)){scene.remove(a);actors.delete(key);}if(m){if(theme!==m.round&&m.round!==undefined){theme=m.round;scene.fog.color.set(['#c0d6e8','#d9c8e3','#c3deda'][theme%3]);renderer.setClearColor(scene.fog.color);}
  focus=m.players.find(p=>p.id===id)||m.players[0];
  spellFX.update(m,t,mode==='battle'&&cameraState.firstPerson?{player:focus,yaw:cameraState.yaw}:null);
  for(const p of m.players){let a=actors.get(p.id);if(a&&a.userData.h.id!==p.hero){scene.remove(a);actors.delete(p.id);a=null;}a=a||character(p);a.visible=!p.dead&&!(cameraState.firstPerson&&mode==='battle'&&p.id===id);

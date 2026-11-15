@@ -28,7 +28,7 @@ if(!isHost){
  }
 }
 let roomInfo=null,auth=null,socket=null,room=null,match=null,selected='luna',quiz=null,quizAnswered=false,quizClosed=0,phase=null,practice=false,practiceBank=[],cameraMode=isHost?'overview':'follow',cameraSide=null,lastAutoWatch=0,autoWatchIndex=0;
-let joystick={forward:0,right:0},keys=new Set(),pressed=new Set(),toastTimer,online=false,qrCode=null;
+let joystick={forward:0,right:0},keys=new Set(),pressed=new Set(),skillTaps=new Set(),toastTimer,online=false,qrCode=null;
 const arena=createArena($('#arena'));
 const titles={entry:'HỌC VIỆN PHÉP THUẬT',host:'BẢNG ĐIỀU KHIỂN QUẢN TRÒ',selection:'CHỌN NGƯỜI BẠN ĐỒNG HÀNH',waiting:'SẴN SÀNG VÀO ĐẤU TRƯỜNG',result:'VINH DANH NHÀ VÔ ĐỊCH'};
 const clock=n=>{n=Math.max(0,Math.ceil(n));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');};
@@ -38,10 +38,10 @@ function run(fn){return async e=>{try{await fn(e);}catch(err){toast(err.message|
 function bind(id,fn){$('#'+id).addEventListener('click',run(fn));}
 const slideshow=createHeroSlideshow($('#slideArt'),$('#slideCaption'),heroes,id=>asset(id,'sheets'));
 function show(v){if(v==='waiting'&&$('#waiting').hidden)slideshow.start(performance.now());for(const id of screenIDs)$('#'+id).hidden=id!==v;if(isHost)$('#battle').hidden=false;$('#pageTitle').textContent=titles[v]||'HỌC VIỆN PHÉP THUẬT';document.body.classList.toggle('in-battle',v==='battle');checkOrientation();}
-function modal(content){$('#modalBody').innerHTML=content;$('#modal').hidden=false;}
+function modal(content){skillTaps.clear();$('#modalBody').innerHTML=content;$('#modal').hidden=false;}
 function closeModal(){$('#modal').hidden=true;}
 bind('modalClose',closeModal);$('#modal').addEventListener('click',e=>{if(e.target===$('#modal'))closeModal();});
-function detail(id){$('#detailArt').src=asset(id,'sheets');$('#detailArt').alt=hero(id).name+' và chiêu thức';$('#heroDetail').hidden=false;keys.clear();pressed.clear();}
+function detail(id){$('#detailArt').src=asset(id,'sheets');$('#detailArt').alt=hero(id).name+' và chiêu thức';$('#heroDetail').hidden=false;keys.clear();pressed.clear();skillTaps.clear();}
 bindHeroDetails(detail);
 $('#heroDetail').addEventListener('pointerdown',()=>$('#heroDetail').hidden=true);
 window.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#heroDetail').hidden=true;closeModal();}});
@@ -49,7 +49,7 @@ async function api(path,body,method){const r=await fetch(apiUrl(path),{method:me
 async function session(name,host=false,password){let old;try{old=JSON.parse(localStorage.getItem(host?'mila-host':'mila-player')||'null');}catch{}auth=await api(host?'/api/host':'/api/guest',{nickname:name,password,resumeToken:old?.name===name||host?old?.token:undefined});localStorage.setItem(host?'mila-host':'mila-player',JSON.stringify(auth));return auth;}
 function emit(event,data={}){if(!socket)throw Error('Hãy vào phòng trước.');return new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('Kết nối chậm. Hãy thử lại.')),12000);socket.emit(event,data,r=>{clearTimeout(timeout);if(r?.error)reject(Error(r.error));else resolve(r||{});});});}
 async function connect(code,team=0,spectator=isHost,rosterId){let didJoin=false;socket?.disconnect();socket=makeSocket({auth:{token:auth.token}});await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('Không kết nối được máy chủ.')),12000);socket.on('connect',()=>{clearTimeout(timeout);online=true;$('#connection').textContent='● Đã kết nối';if(didJoin)socket.emit('join',{code,team,spectator,rosterId},r=>{if(r?.room)updateRoom(r.room);if(r?.error)toast(r.error);});resolve();});socket.on('connect_error',e=>{clearTimeout(timeout);reject(e);});});
- socket.on('room',r=>updateRoom(r));socket.on('match',m=>updateMatch(m));socket.on('question',q=>openQuiz(q));socket.on('chat',c=>{teamChat.push(c);teamChat=teamChat.slice(-30);renderChat();});socket.on('disconnect',()=>{online=false;$('#connection').textContent='◌ Đang kết nối lại…';keys.clear();pressed.clear();});
+ socket.on('room',r=>updateRoom(r));socket.on('match',m=>updateMatch(m));socket.on('question',q=>openQuiz(q));socket.on('chat',c=>{teamChat.push(c);teamChat=teamChat.slice(-30);renderChat();});socket.on('disconnect',()=>{online=false;$('#connection').textContent='◌ Đang kết nối lại…';keys.clear();pressed.clear();skillTaps.clear();});
  const joined=await emit('join',{code,team,spectator,rosterId});didJoin=true;updateRoom(joined.room);sessionStorage.setItem(isHost?'mila-host-room':'mila-player-room',JSON.stringify({code,team,spectator,mode:joined.room.mode}));
 }
 function emblem(i){const key=room?.emblems?.[i]||['phoenix','cat','deer','dragon'][i];return `<img class="team-emblem" src="/assets/mila/teams/${key}.webp" alt="Biểu tượng đội">`;}
@@ -149,10 +149,39 @@ checkOrientation();
 
 
 makeJoystick($('#joystick'),v=>joystick=v);
-for(const b of $$('[data-skill]')){const k=+b.dataset.skill;b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);pressed.add(k);});for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,()=>pressed.delete(k));}
-window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||!$('#modal').hidden||!$('#heroDetail').hidden)return;if(['w','a','s','d','q','e','r',' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();keys.add(e.key.toLowerCase());}});window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();pressed.clear();joystick={forward:0,right:0};});
-function input(){if(!$('#modal').hidden||!$('#heroDetail').hidden||!$('#quiz').hidden)return arena.view();const right=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0)+(joystick.right||0),down=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0)-(joystick.forward||0);return{...arena.view(),...arena.movement(-down,right),a0:pressed.has(0)||keys.has(' '),a1:pressed.has(1)||keys.has('q'),a2:pressed.has(2)||keys.has('e'),a3:pressed.has(3)||keys.has('r')};}
-function openQuiz(q){if(quiz?.index===q.index&&quiz?.at===q.at)return;quiz=q;quizAnswered=false;quizClosed=0;keys.clear();pressed.clear();$('#quiz').hidden=false;$('#quizText').textContent=q.text;$('#quizReason').textContent=q.reason.includes('death')?'Hồi sinh · Thử thách tri thức':'Lên cấp '+q.level+' · Thử thách tri thức';$('#quizFeedback').textContent='Trả lời đúng để nhận thưởng và mở chiêu cuối.';$('#answerTrue').disabled=false;$('#answerFalse').disabled=false;}
+for(const button of $$('[data-skill]')){
+ const skill=Number(button.dataset.skill);
+ button.addEventListener('pointerdown',event=>{
+  if(event.button!==0||!canUseBattleControls())return;
+  event.preventDefault();
+  button.setPointerCapture(event.pointerId);
+  pressed.add(skill);
+  skillTaps.add(skill);
+  if(!practice&&online)sendBattleInput();
+ });
+ for(const type of ['pointerup','pointercancel','lostpointercapture']){
+  button.addEventListener(type,()=>pressed.delete(skill));
+ }
+}
+window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||!$('#modal').hidden||!$('#heroDetail').hidden)return;if(['w','a','s','d','q','e','r',' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();keys.add(e.key.toLowerCase());}});window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();pressed.clear();skillTaps.clear();joystick={forward:0,right:0};});
+function canUseBattleControls(){
+ return room?.phase==='battle'&&!room.paused&&!isHost&&
+  $('#modal').hidden&&$('#heroDetail').hidden&&$('#quiz').hidden;
+}
+function input(){if(!canUseBattleControls())return arena.view();const right=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0)+(joystick.right||0),down=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0)-(joystick.forward||0);return{...arena.view(),...arena.movement(-down,right),a0:pressed.has(0)||keys.has(' '),a1:pressed.has(1)||keys.has('q'),a2:pressed.has(2)||keys.has('e'),a3:pressed.has(3)||keys.has('r')};}
+function takeBattleInput(){
+ const controls=input();
+ const taps=canUseBattleControls()?[...skillTaps]:[];
+ skillTaps.clear();
+ if(!practice)return {...controls,skillTaps:taps};
+ for(const skill of taps)controls['a'+skill]=true;
+ return controls;
+}
+function sendBattleInput(){
+ lastSend=performance.now();
+ socket?.emit('input',takeBattleInput());
+}
+function openQuiz(q){if(quiz?.index===q.index&&quiz?.at===q.at)return;quiz=q;quizAnswered=false;quizClosed=0;keys.clear();pressed.clear();skillTaps.clear();$('#quiz').hidden=false;$('#quizText').textContent=q.text;$('#quizReason').textContent=q.reason.includes('death')?'Hồi sinh · Thử thách tri thức':'Lên cấp '+q.level+' · Thử thách tri thức';$('#quizFeedback').textContent='Trả lời đúng để nhận thưởng và mở chiêu cuối.';$('#answerTrue').disabled=false;$('#answerFalse').disabled=false;}
 function finishQuizTimeout(){if(!quiz||quizAnswered)return;quizAnswered=true;quizClosed=Date.now()+1800;$('#quizFeedback').textContent='Hết giờ · Không nhận thưởng.';$('#answerTrue').disabled=true;$('#answerFalse').disabled=true;}
 async function answer(value){if(!quiz||quizAnswered)return;quizAnswered=true;$('#answerTrue').disabled=true;$('#answerFalse').disabled=true;try{const a=practice?answerQuiz(match,match.players.find(p=>p.id===auth.id),quiz.index,value):await emit('answer',{index:quiz.index,value});if(!a)throw Error('Câu hỏi đã hết giờ.');const ok=a.isCorrect===true;$('#quizFeedback').textContent=ok?`✓ Chính xác! +${a.points} điểm · Đã mở chiêu cuối`:`✕ Chưa đúng. Đáp án: ${a.correctAnswer?'Đúng':'Sai'} · Không nhận thưởng`;quizClosed=Date.now()+2200;}catch(e){$('#quizFeedback').textContent=e.message;quizClosed=Date.now()+1800;}}
 bind('answerTrue',()=>answer(true));bind('answerFalse',()=>answer(false));
@@ -176,7 +205,7 @@ bind('exportPDF',()=>{if(!room)throw Error('Tạo phòng trước.');modal(`<h2>
 bind('replay',()=>modal('<h2>Bắt đầu giải mới?</h2><p>Kết quả giải hiện tại được lưu trong lịch sử máy chủ.</p><button id="confirmReplay" class="primary">Lưu giải cũ & chơi lại</button>'));
 document.addEventListener('click',run(async e=>{if(e.target.id==='confirmReplay'){await emit('mc',{action:'replay'});match=null;closeModal();toast('Đã lưu giải cũ và mở lại sảnh.');}}));
 arena.input(()=>room?.phase==='battle'&&!room?.paused?input():{});
-let prevTick=performance.now(),lastSend=0;function gameFrame(now){const dt=Math.min(.05,(now-prevTick)/1000);prevTick=now;if(practice&&room?.phase==='battle'&&!room.paused){for(const p of match.players)p.input=p.bot?botInput(match,p):input();step(match,dt);pumpQuizzes(match,practiceBank);const me=match.players.find(p=>p.id===auth.id);if(me.quiz&&!me.quiz.resolved)openQuiz(publicQuiz(me.quiz));for(const p of match.players)if(p.bot&&p.quiz&&!p.quiz.resolved&&match.time-p.quiz.at>2)answerQuiz(match,p,p.quiz.index,Math.random()<.7?p.quiz.answer:!p.quiz.answer);updateMatch(match);if(match.done){room.phase='result';room.results=[{...matchResult(match),pair:match.pair,players:match.players}];$('#quiz').hidden=true;renderResult();}}else if(room?.phase==='battle'&&!isHost&&online&&now-lastSend>=50){lastSend=now;socket?.emit('input',input());}requestAnimationFrame(gameFrame);}requestAnimationFrame(gameFrame);
+let prevTick=performance.now(),lastSend=0;function gameFrame(now){const dt=Math.min(.05,(now-prevTick)/1000);prevTick=now;if(practice&&room?.phase==='battle'&&!room.paused){for(const p of match.players)p.input=p.bot?botInput(match,p):takeBattleInput();step(match,dt);pumpQuizzes(match,practiceBank);const me=match.players.find(p=>p.id===auth.id);if(me.quiz&&!me.quiz.resolved)openQuiz(publicQuiz(me.quiz));for(const p of match.players)if(p.bot&&p.quiz&&!p.quiz.resolved&&match.time-p.quiz.at>2)answerQuiz(match,p,p.quiz.index,Math.random()<.7?p.quiz.answer:!p.quiz.answer);updateMatch(match);if(match.done){room.phase='result';room.results=[{...matchResult(match),pair:match.pair,players:match.players}];$('#quiz').hidden=true;renderResult();}}else if(room?.phase==='battle'&&!isHost&&online&&now-lastSend>=50){sendBattleInput();}requestAnimationFrame(gameFrame);}requestAnimationFrame(gameFrame);
 setInterval(()=>{if(room?.phase==='select')$('#selectTime').textContent=Math.max(0,Math.ceil((room.selectionEnds-Date.now())/1000));if(!$('#waiting').hidden)slideshow.tick(performance.now());if(quiz&&!$('#quiz').hidden){if(!quizAnswered){const left=Math.max(0,10-((match?.time||0)-quiz.at));$('#quizTime').textContent=Math.ceil(left)+'s';$('#quizProgress').style.width=left*10+'%';}else if(quizClosed&&Date.now()>quizClosed){$('#quiz').hidden=true;quizClosed=0;}}if(isHost&&room?.phase==='select')$('#hostHint').textContent='Còn '+Math.max(0,Math.ceil((room.selectionEnds-Date.now())/1000))+' giây chọn tướng.';},100);
 async function init(){if(isHost){$('#observerMount').append($('#battle'));$('#battle').hidden=false;$('#battle').classList.add('spectator');show('host');$('#battle').hidden=false;arena.camera('overview');const ps=heroes.slice(0,5).map((h,i)=>({id:h.id,name:h.name,hero:h.id,slot:i,team:i<3?0:1}));const preview=createMatch(ps,[0,1],420);preview.players.forEach((p,i)=>{p.x=(i-2)*3;p.z=i%2?2:-2;});arena.snapshot(preview,null);await hostLogin();await loadRooms();const saved=JSON.parse(sessionStorage.getItem('mila-host-room')||'null');if(saved)await connect(saved.code);}
  else{show('entry');if($('#roomCode').value)await findRoom();const saved=JSON.parse(sessionStorage.getItem('mila-player-room')||'null'),old=JSON.parse(localStorage.getItem('mila-player')||'null'),params=new URLSearchParams(location.search),requestedMode=params.get('mode');if(!trialMode&&saved&&(!requestedMode||saved.mode===requestedMode)&&old?.token&&(!params.get('room')||params.get('room')===saved.code)){auth=old;if(isVersus(saved.mode))playMode=saved.mode;await connect(saved.code,saved.team,saved.spectator);}}}
