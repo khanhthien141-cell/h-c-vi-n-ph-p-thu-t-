@@ -1,0 +1,6 @@
+const enc=new TextEncoder();
+async function digest(password,salt){const key=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:enc.encode(salt),iterations:100000},key,256);return Array.from(new Uint8Array(bits),n=>n.toString(16).padStart(2,'0')).join('');}
+export async function makePassword(password){if(typeof password!=='string'||password.length<8||password.length>128)throw Error('Mật khẩu cần 8–128 ký tự.');const salt=crypto.randomUUID();return{salt,hash:await digest(password,salt),epoch:crypto.randomUUID()};}
+export async function checkPassword(password,record,initial){if(typeof password!=='string'||password.length>128)return false;if(!record){if(!initial)return false;const a=await crypto.subtle.digest('SHA-256',enc.encode(password)),b=await crypto.subtle.digest('SHA-256',enc.encode(initial));return equal(new Uint8Array(a),new Uint8Array(b));}return equal(enc.encode(await digest(password,record.salt)),enc.encode(record.hash));}
+function equal(a,b){if(a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a[i]^b[i];return diff===0;}
+export const passwordEpoch=(record,initial)=>record?.epoch||(initial?'configured-v1':'unconfigured');
