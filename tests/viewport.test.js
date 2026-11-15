@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const source=fs.readFileSync('public/viewport.js','utf8').split('let scheduled=')[0];
-const {viewportLayout,needsLandscapePrompt}=await import('data:text/javascript,'+encodeURIComponent(source));
+const {viewportLayout,needsLandscapePrompt,lockLandscape}=await import('data:text/javascript,'+encodeURIComponent(source));
 test('native portrait and landscape preserve real screen dimensions on phones',()=>{
  for(const [w,h]of [[240,320],[320,568],[360,800],[375,667],[390,844],[430,932],[412,915],[768,1024],[844,390],[932,430],[320,280]]){
   for(const touch of [true,false])for(const editing of [true,false]){
@@ -28,7 +28,16 @@ test('phones request real landscape for battles, without breaking room entry or 
  }
  for(const [w,h]of [[844,390],[932,430],[640,320]])assert.equal(needsLandscapePrompt(viewportLayout(w,h,true),true,false),false);
  assert.equal(needsLandscapePrompt(viewportLayout(800,1200,false),true,false),false);
- const code=fs.readFileSync('public/mila-app.js','utf8');
- assert.match(code,/screen\.orientation\?\.lock/);
+ const code=fs.readFileSync('public/viewport.js','utf8');
  assert.doesNotMatch(code,/rotate\(90deg\)/);
+ for(const file of ['public/mila-app.js','public/trial/mila-app.js'])assert.match(fs.readFileSync(file,'utf8'),/void enterMobileLandscape\(\)/);
+});
+
+test('landscape lock is requested when available and denial leaves the game playable',async()=>{
+ let requested;
+ assert.equal(await lockLandscape({lock(mode){requested=mode;}}),true);
+ assert.equal(requested,'landscape');
+ assert.equal(await lockLandscape({lock(){throw Error('blocked');}}),false);
+ assert.equal(await lockLandscape({lock(){return Promise.reject(Error('fullscreen required'));}}),false);
+ assert.equal(await lockLandscape({}),false);
 });
