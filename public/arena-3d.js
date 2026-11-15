@@ -9,8 +9,16 @@ export function createArena(canvas){
  let scene;try{scene=makeScene(canvas,state);}catch(e){scene=makeFallbackScene(canvas,state);canvas=scene.canvas;}canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();scene.destroy?.();scene=makeFallbackScene(canvas,state);canvas=scene.canvas;});const positions=new Map();let externalClock=false;let match=null,id=null,previous=new Map(),received=0,last=0,readInput=()=>({}),mode='follow',side=null,selectedPlayer=null,drag=null;
  function reset(){resetCamera(state,side||0);state.pitch=0;state.distance=9;}
  const api={view(){return{viewYaw:state.yaw,viewPitch:state.pitch};},externalClock(){externalClock=true;},render:frame,input(fn){readInput=fn;},movement(forward,right){return cameraMovement(state,forward,right);},camera(v,t){mode=v;state.firstPerson=!['third','third-player','overview','team'].includes(v);if(v==='player'||v==='third-player'){selectedPlayer=t;state.distance=9;}if(v==='team'){side=t;reset();}if(v==='follow'&&!state.userMoved)reset();},zoom(d){state.firstPerson=false;state.pitch=.3;mode='third';zoomCamera(state,-d*600);},reset,snapshot(m,who){
- if(!match||m.time<match.time||m.players.map(p=>p.id).join()!==match.players.map(p=>p.id).join()){positions.clear();side=m.pair.indexOf(m.players.find(p=>p.id===who)?.team);reset();}
- previous=new Map((match?.players||[]).map(p=>[p.id,{x:p.x,z:p.z,time:match.time,dead:p.dead}]));match=m;id=who;received=performance.now();
+ const resetPositions=!match||m.time<match.time||m.players.map(p=>p.id).join()!==match.players.map(p=>p.id).join();
+ if(resetPositions){
+  positions.clear();previous.clear();
+  side=m.pair.indexOf(m.players.find(p=>p.id===who)?.team);
+  reset();
+ }else if(m.time>match.time){
+  previous=new Map(match.players.map(p=>[p.id,{x:p.x,z:p.z,time:match.time,dead:p.dead}]));
+ }
+ if(resetPositions||m.time!==match.time||m.paused!==match.paused)received=performance.now();
+ match=m;id=who;
  }};
  canvas.addEventListener('pointerdown',e=>{drag={id:e.pointerId,x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);});
  canvas.addEventListener('pointermove',e=>{if(drag?.id!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;rotateCamera(state,dx,dy);drag={id:e.pointerId,x:e.clientX,y:e.clientY};});
