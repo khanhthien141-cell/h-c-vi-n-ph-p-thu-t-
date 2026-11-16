@@ -1,4 +1,5 @@
 import {ACADEMY_MAP} from '/shared/arena-layout.js';
+import {heroes} from '/shared/heroes.js';
 import {Group} from '/vendor/three.module.js';
 import {createSpellFX} from './spell-fx.js';
 import {paintSpellCanvas} from './spell-canvas.js';
@@ -17,7 +18,7 @@ export function makeFallbackScene(original){
  canvas.parentElement.querySelector('#rendererNotice')?.remove();canvas.after(note);
  let mode='battle';
  const spellFX=createSpellFX(new Group(),{sequencesOnly:true});
- const colors=['#70e0b3','#db9ffb','#ffd47d','#90d5ff'];
+ const maxHealth=new Map(heroes.map(h=>[h.id,h.hp]));
  function ring(x,y,r,color,line=3){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.strokeStyle=color;ctx.lineWidth=line;ctx.stroke();}
  function render(m,id,t){
   const w=canvas.clientWidth,h=canvas.clientHeight;if(!w||!h)return;
@@ -35,10 +36,11 @@ export function makeFallbackScene(original){
   }else{ctx.fillStyle='#cfbfdd';ctx.fillRect(0,0,w,h);}
   const scale=Math.min(w/ACADEMY_MAP.width,h/ACADEMY_MAP.depth);
   const X=x=>w*(.5+x/ACADEMY_MAP.width),Y=z=>h*(.5+z/ACADEMY_MAP.depth);
+  const viewTeam=m?.players.find(p=>p.id===id)?.team??m?.pair?.[0];
   for(const p of m?.players||[]){
    if(p.dead)continue;
    const x=X(p.x),y=Y(p.z),r=Math.max(11,Math.min(22,scale*.87));
-   const color=colors[p.team%colors.length],glow=p.id===id;
+   const color=p.team===viewTeam?'#91f6a8':'#ff767e',glow=p.id===id;
    ctx.save();ctx.shadowColor=color;ctx.shadowBlur=glow?22:12;
    ctx.fillStyle='rgba(28,18,43,.75)';ctx.beginPath();ctx.arc(x,y,r+4,0,Math.PI*2);ctx.fill();
    ctx.shadowBlur=0;ring(x,y,r+2,glow?'#fff1a2':color,glow?4:2.5);
@@ -48,9 +50,10 @@ export function makeFallbackScene(original){
    else{ctx.fillStyle=color;ctx.fillRect(x-r,y-r,r*2,r*2);}
    ctx.restore();
    ctx.fillStyle='rgba(32,22,45,.82)';ctx.fillRect(x-r-8,y-r-22,r*2+16,15);
-   ctx.font='600 10px system-ui';ctx.textAlign='center';ctx.fillStyle='#fff6e5';ctx.fillText(String(p.name||'Nhân vật').slice(0,14),x,y-r-11);
-   const hp=Math.max(0,Math.min(1,(p.hp||0)/120));ctx.fillStyle='#44384a';ctx.fillRect(x-r,y+r+6,r*2,4);
-   ctx.fillStyle=hp>.35?'#9df1b7':'#ffac9e';ctx.fillRect(x-r,y+r+6,r*2*hp,4);
+   ctx.font='600 10px system-ui';ctx.textAlign='center';ctx.fillStyle=color;ctx.fillText(String(p.name||'Nhân vật'),x,y-r-11,r*2+12);
+   const hp=Math.max(0,Math.min(1,(p.hp||0)/(maxHealth.get(p.hero)||120)));
+   ctx.fillStyle='#44384a';ctx.fillRect(x-r,y-r-6,r*2,4);
+   ctx.fillStyle=color;ctx.fillRect(x-r,y-r-6,r*2*hp,4);
   }
   spellFX.update(m,t);
   paintSpellCanvas(ctx,spellFX.root,X,Y,scale);
