@@ -24,7 +24,15 @@ function openVersusSelection(r){
  if(!r.questionIds.length)throw Error('Phòng chưa có câu hỏi để thi đấu.');
  r.phase='select';prepareSelection(r);r.uiVersion++;return true;
 }
+export function requireRoomAccess(r,u){
+ if(u.id===r.owner)return;
+ const name=cleanName(u.name).toLocaleLowerCase();
+ if(r.kicked?.some(p=>p.id===u.id||p.name===name)){
+  throw Object.assign(new Error('Quản trò đã mời bạn ra khỏi phòng này.'),{code:'room_kicked'});
+ }
+}
 export function joinRoom(r,u,d){
+ requireRoomAccess(r,u);
  if(isVersus(r.mode)&&!r.managed){
  if(d.spectator)throw Error('Phòng này chỉ dành cho người chơi.');
  if(!r.players.some(p=>p.id===u.id)){const size=teamSize(r.mode);if(r.phase!=='lobby'||r.players.length>=size*2)throw Error('Phòng đã đủ người hoặc đang thi đấu.');const team=size>1?(r.players.filter(p=>p.team===0).length<=r.players.filter(p=>p.team===1).length?0:1):r.players.length;const slot=r.players.filter(p=>p.team===team).length;r.players.push({id:u.id,name:u.name,team,hero:null,heroReady:false,slot,approved:true});if(r.mode==='duel')r.teams[team]=u.name;r.uiVersion++;if(r.players.length===size*2){r.phase='select';r.questionIds=bankFor(r).map(q=>q.id);prepareSelection(r);}}return r;
@@ -36,7 +44,25 @@ export function finishRoom(r){if(!r.match||!['battle'].includes(r.phase))return;
 export function commandRoom(r,u,d){if(r.owner!==u.id)throw Error('Chỉ máy chủ của phòng này được điều khiển.');
  if(isVersus(r.mode)&&!r.managed)throw Error('Phòng này tự bắt đầu khi đủ người.');
  const action=d.action;
- if(action==='roster'){saveRoster(r,d.rows);}
+ if(action==='kick'){
+  const player=r.players.find(p=>p.id===d.id&&!p.bot);
+  if(!player)throw Error('Người chơi này đã rời phòng.');
+  r.kicked??=[];
+  r.kicked.push({id:player.id,name:cleanName(player.name).toLocaleLowerCase()});
+  if(r.phase==='lobby'){
+   r.players=r.players.filter(p=>p.id!==player.id);
+   r.players.filter(p=>p.team===player.team).forEach((p,slot)=>{p.slot=slot;});
+  }else{
+   // Preserve team size and the current round when moderation happens mid-game.
+   const used=new Set(r.players.filter(p=>p.team===player.team&&p.id!==player.id).map(p=>p.hero));
+   const replacement={id:id(),name:'Máy thay · '+player.name,team:player.team,slot:player.slot,approved:player.approved,bot:true,
+    hero:player.hero||heroes.find(h=>!used.has(h.id)).id,heroReady:true,rosterId:null,rosterName:null};
+   r.players[r.players.indexOf(player)]=replacement;
+   const actor=r.match?.players.find(p=>p.id===player.id);
+   if(actor&&r.phase==='battle')Object.assign(actor,replacement,{input:{},online:true});
+  }
+ }
+ else if(action==='roster'){saveRoster(r,d.rows);}
  else if(action==='settings'){if(r.phase!=='lobby')throw Error('Chỉ chỉnh trước giải.');const semi=Number(d.semiSeconds),final=Number(d.finalSeconds);if(!Number.isInteger(semi)||!Number.isInteger(final)||semi<60||semi>1800||final<60||final>1800)throw Error('Thời gian từ 60–1800 giây.');r.settings={semiSeconds:semi,finalSeconds:final};}
  else if(action==='approve'){const p=r.players.find(p=>p.id===d.id);if(p)p.approved=true;openVersusSelection(r);}
  else if(action==='bots'){if(r.phase!=='lobby')throw Error('Chỉ thêm máy trước giải.');for(let team=0;team<(r.managed&&r.mode!=='tournament'?2:4);team++)while(r.players.filter(p=>p.team===team).length<teamSize(r.mode)){const ps=r.players.filter(p=>p.team===team);r.players.push({id:id(),name:'Máy '+(team+1)+'-'+(ps.length+1),team,hero:heroes.find(h=>!ps.some(p=>p.hero===h.id)).id,slot:ps.length,approved:true,bot:true});}}
@@ -60,7 +86,7 @@ export function tickRoom(r,inputs=[],now=Date.now()){
  return true;
 }
 export function inputData(data){return{viewYaw:Number.isFinite(data?.viewYaw)?clamp(data.viewYaw,-10000,10000):undefined,viewPitch:Number.isFinite(data?.viewPitch)?clamp(data.viewPitch,-1.35,1.35):0,x:clamp(Number(data?.x)||0,-1,1),z:clamp(Number(data?.z)||0,-1,1),a0:!!data?.a0,a1:!!data?.a1,a2:!!data?.a2,a3:!!data?.a3};}
-export function playerAction(r,u,event,d){if(event==='selectHero'){lockHero(r,u.id,d.hero);return{ok:true,room:publicRoom(r)};}const p=r.match?.players.find(p=>p.id===u.id);if(event==='answer'){if(!p||r.phase!=='battle'||r.paused)throw Error('Câu hỏi đã đóng.');const a=answerQuiz(r.match,p,d.index,d.value);if(!a)throw Error('Câu hỏi đã đóng hoặc bạn đã trả lời.');return a;}
+export function playerAction(r,u,event,d){requireRoomAccess(r,u);if(event==='selectHero'){lockHero(r,u.id,d.hero);return{ok:true,room:publicRoom(r)};}const p=r.match?.players.find(p=>p.id===u.id);if(event==='answer'){if(!p||r.phase!=='battle'||r.paused)throw Error('Câu hỏi đã đóng.');const a=answerQuiz(r.match,p,d.index,d.value);if(!a)throw Error('Câu hỏi đã đóng hoặc bạn đã trả lời.');return a;}
  if(event==='buy'){if(!p||r.phase!=='battle'||r.paused||!['power','shield'].includes(d.item)||p.items.includes(d.item)||p.wallet<200)throw Error('Cần 200 điểm ví; mỗi món mua một lần.');p.wallet-=200;p.items.push(d.item);if(d.item==='shield')p.shield+=80;return{ok:true};}
  if(event==='chat'){const pp=r.players.find(p=>p.id===u.id);if(!pp?.approved)throw Error('Chờ MC duyệt.');const last=(r.chats||[]).filter(c=>c.id===u.id).at(-1);if(last&&Date.now()-last.at<2000)throw Error('Chờ 2 giây giữa tin nhắn.');const text=String(d.text||'').trim().slice(0,120).replace(/https?:\/\/\S+/gi,'[liên kết]').replace(/\b(fuck|shit|vcl|dm|đm)\b/gi,'***');r.chats??=[];r.chats.push({seq:id(),id:u.id,name:u.name,team:pp.team,text,at:Date.now()});r.chats=r.chats.slice(-80);return{ok:true};}throw Error('Thao tác không hợp lệ.');}
 export function packet(r,u){const p=r.match?.players.find(p=>p.id===u.id),team=r.players.find(p=>p.id===u.id)?.team;return{ok:true,room:publicRoom(r),owner:r.owner===u.id,match:safeMatch(r.match),question:p?.quiz&&!p.quiz.resolved?publicQuiz(p.quiz):null,chats:(r.chats||[]).filter(c=>c.team===team).slice(-10)};}

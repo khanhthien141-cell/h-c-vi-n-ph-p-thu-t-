@@ -3,7 +3,7 @@ import {makePassword,checkPassword,passwordEpoch} from '../server/host-auth.js';
 import {roomInfo} from '../shared/roster.js';
 import ASSETS from 'arcana:assets';
 import * as XLSX from 'xlsx';
-import {newRoom,publicRoom,joinRoom,commandRoom,tickRoom,inputData,playerAction,packet,bankFor,cleanName,id} from '../shared/room-core.js';
+import {newRoom,publicRoom,requireRoomAccess,joinRoom,commandRoom,tickRoom,inputData,playerAction,packet,bankFor,cleanName,id} from '../shared/room-core.js';
 const json=(v,status=200)=>Response.json(v,{status,headers:{'Cache-Control':'no-store'}});
 async function get(db,key){return db.prepare('SELECT value, revision FROM arcana_store WHERE key = ?').bind(key).first();}
 async function set(db,key,value){await db.prepare('INSERT INTO arcana_store (key,value,revision) VALUES (?,?,0) ON CONFLICT(key) DO UPDATE SET value=excluded.value, revision=arcana_store.revision+1').bind(key,JSON.stringify(value)).run();}
@@ -12,15 +12,17 @@ async function user(db,request,env){const t=request.headers.get('Authorization')
 async function mutate(db,code,fn){for(let attempt=0;attempt<24;attempt++){const row=await get(db,'room:'+code);if(!row)throw Error('Không tìm thấy mã phòng.');const r=JSON.parse(row.value),value=await fn(r);const out=await db.prepare('UPDATE arcana_store SET value = ?, revision = revision + 1 WHERE key = ? AND revision = ?').bind(JSON.stringify(r),'room:'+code,row.revision).run();if(out.meta.changes)return{r,value};if(attempt>1)await new Promise(resolve=>setTimeout(resolve,Math.min(80,attempt*5)+Math.random()*12));}throw Error('Có nhiều người vào phòng cùng lúc. Hãy thử lại sau 1 giây.');}
 async function poll(db,code,u,data){
  const row=await get(db,'room:'+code);if(!row)throw Error('Không tìm thấy phòng.');let r=JSON.parse(row.value);
+ requireRoomAccess(r,u);
  if(r.owner!==u.id&&!r.players.some(p=>p.id===u.id)&&!u.spectating?.includes(code))throw Error('Hãy vào phòng trước.');
  if(r.match?.players.some(p=>p.id===u.id)&&data.input)await set(db,'input:'+code+':'+u.id,{id:u.id,at:Date.now(),input:inputData(data.input)});
  if(['battle','select'].includes(r.phase)){
   const inputs=r.phase==='battle'&&!r.paused?await list(db,'input:'+code+':'):[];
   if(tickRoom(r,inputs)){const out=await db.prepare('UPDATE arcana_store SET value=?, revision=revision+1 WHERE key=? AND revision=?').bind(JSON.stringify(r),'room:'+code,row.revision).run();if(!out.meta.changes)r=JSON.parse((await get(db,'room:'+code)).value);}
  }
+ requireRoomAccess(r,u);
  return packet(r,u);
 }
-async function api(request,env,path){const db=env.DB;if(path==='/api/health')return json({ok:true,version:'2.0.0',protocol:'polling',storage:!!db});if(!db)return json({error:'Máy chủ đang khởi tạo dữ liệu.'},503);
+async function api(request,env,path){const db=env.DB;if(path==='/api/health')return json({ok:true,version:'2.0.0',protocol:'polling',storage:!!db,roomModeration:true});if(!db)return json({error:'Máy chủ đang khởi tạo dữ liệu.'},503);
  const body=request.method==='GET'?{}:await request.json().catch(()=>({}));
  if(['/api/guest','/api/host'].includes(path)&&request.method==='POST'){
  const role=path.endsWith('host')?'host':'guest',name=cleanName(body.nickname||body.name||(role==='host'?'Quản trò':''));if(!name)throw Error('Nhập biệt danh.');
@@ -56,4 +58,4 @@ async function api(request,env,path){const db=env.DB;if(path==='/api/health')ret
  const edit=path.match(/^\/api\/bank\/([a-zA-Z0-9_-]+)$/);if(edit&&request.method==='PATCH'){if(u.role!=='host')return json({error:'Chỉ máy chủ.'},403);const rooms=(await list(db,'room:')).filter(r=>r.owner===u.id&&(r.bank||[]).some(q=>q.id===edit[1]));if(!rooms.length)throw Error('Không tìm thấy câu hỏi của bạn.');if(rooms.some(r=>['select','battle'].includes(r.phase)&&r.questionIds.includes(edit[1])))throw Error('Câu hỏi đã khóa trong trận.');if(typeof body.text!=='string'||typeof body.answer!=='boolean')throw Error('Dữ liệu không hợp lệ.');for(const room of rooms)await mutate(db,room.code,r=>{const q=r.bank.find(q=>q.id===edit[1]);q.text=body.text.slice(0,500);q.answer=body.answer;});return json({ok:true});}
  return json({error:'Không tìm thấy chức năng.'},404);
 }
-export default{async fetch(request,env){try{const url=new URL(request.url);if(url.pathname.startsWith('/api/'))return await api(request,env,url.pathname);const path=['/mc','/mc.html'].includes(url.pathname)?'/mc.html':['/play','/player','/player.html'].includes(url.pathname)?'/player.html':url.pathname==='/'?'/index.html':url.pathname;const asset=ASSETS[path];if(!asset)return new Response('Không tìm thấy trang',{status:404});const bytes=asset.text!==undefined?new TextEncoder().encode(asset.text):Uint8Array.from(atob(asset.base64),c=>c.charCodeAt(0));const headers={'Content-Type':asset.type,'Cache-Control':path.endsWith('.mp4')?'public, max-age=86400':'no-cache','Accept-Ranges':'bytes'};const range=request.headers.get('Range')?.match(/^bytes=(\d+)-(\d*)$/);if(range){const start=Number(range[1]),end=Math.min(bytes.length-1,range[2]?Number(range[2]):bytes.length-1);if(start>=bytes.length)return new Response(null,{status:416});return new Response(bytes.slice(start,end+1),{status:206,headers:{...headers,'Content-Range':`bytes ${start}-${end}/${bytes.length}`}});}return new Response(request.method==='HEAD'?null:bytes,{headers});}catch(error){return json({error:error.message||'Máy chủ chưa sẵn sàng.'},400);}}};
+export default{async fetch(request,env){try{const url=new URL(request.url);if(url.pathname.startsWith('/api/'))return await api(request,env,url.pathname);const path=['/mc','/mc.html'].includes(url.pathname)?'/mc.html':['/play','/player','/player.html'].includes(url.pathname)?'/player.html':url.pathname==='/'?'/index.html':url.pathname;const asset=ASSETS[path];if(!asset)return new Response('Không tìm thấy trang',{status:404});const bytes=asset.text!==undefined?new TextEncoder().encode(asset.text):Uint8Array.from(atob(asset.base64),c=>c.charCodeAt(0));const headers={'Content-Type':asset.type,'Cache-Control':path.endsWith('.mp4')?'public, max-age=86400':'no-cache','Accept-Ranges':'bytes'};const range=request.headers.get('Range')?.match(/^bytes=(\d+)-(\d*)$/);if(range){const start=Number(range[1]),end=Math.min(bytes.length-1,range[2]?Number(range[2]):bytes.length-1);if(start>=bytes.length)return new Response(null,{status:416});return new Response(bytes.slice(start,end+1),{status:206,headers:{...headers,'Content-Range':`bytes ${start}-${end}/${bytes.length}`}});}return new Response(request.method==='HEAD'?null:bytes,{headers});}catch(error){if(error.code==='room_kicked')return json({error:error.message,code:error.code},403);return json({error:error.message||'Máy chủ chưa sẵn sàng.'},400);}}};

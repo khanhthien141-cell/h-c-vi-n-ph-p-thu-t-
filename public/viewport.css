@@ -202,3 +202,8 @@ body.in-battle #orientation.orientation button {width:auto;min-height:34px;margi
  body.in-battle .battle-hud .skill-controls .skill-two {width:56px;height:56px;left:59px;bottom:101px;}
  body.in-battle .battle-hud .skill-controls .ultimate {width:64px;height:64px;right:0;top:0;}
 }
+
+.room-members {list-style:none;margin:0 0 10px;padding:0}
+.room-members li {display:flex;align-items:center;gap:8px;margin:4px 0}
+.room-members li span {flex:1;min-width:0;overflow-wrap:anywhere}
+.room-members [data-kick] {color:#86343e;border-color:#cd8b96;background:#f9e7eb}

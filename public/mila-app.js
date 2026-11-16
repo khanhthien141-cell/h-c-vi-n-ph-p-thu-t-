@@ -49,6 +49,13 @@ async function api(path,body,method){const r=await fetch(apiUrl(path),{method:me
 async function session(name,host=false,password){let old;try{old=JSON.parse(localStorage.getItem(host?'mila-host':'mila-player')||'null');}catch{}auth=await api(host?'/api/host':'/api/guest',{nickname:name,password,resumeToken:old?.name===name||host?old?.token:undefined});localStorage.setItem(host?'mila-host':'mila-player',JSON.stringify(auth));return auth;}
 function emit(event,data={}){if(!socket)throw Error('Hãy vào phòng trước.');return new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('Kết nối chậm. Hãy thử lại.')),12000);socket.emit(event,data,r=>{clearTimeout(timeout);if(r?.error)reject(Error(r.error));else resolve(r||{});});});}
 async function connect(code,team=0,spectator=isHost,rosterId){let didJoin=false;socket?.disconnect();socket=makeSocket({auth:{token:auth.token}});await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('Không kết nối được máy chủ.')),12000);socket.on('connect',()=>{clearTimeout(timeout);online=true;$('#connection').textContent='● Đã kết nối';if(didJoin)socket.emit('join',{code,team,spectator,rosterId},r=>{if(r?.room)updateRoom(r.room);if(r?.error)toast(r.error);});resolve();});socket.on('connect_error',e=>{clearTimeout(timeout);reject(e);});});
+ socket.on('kicked',message=>{
+  online=false;room=null;match=null;quiz=null;
+  keys.clear();pressed.clear();skillTaps.clear();
+  sessionStorage.removeItem('mila-player-room');
+  $('#heroDetail').hidden=true;$('#quiz').hidden=true;
+  closeModal();show('entry');toast(message);
+ });
  socket.on('room',r=>updateRoom(r));socket.on('match',m=>updateMatch(m));socket.on('question',q=>openQuiz(q));socket.on('chat',c=>{teamChat.push(c);teamChat=teamChat.slice(-30);renderChat();});socket.on('disconnect',()=>{online=false;$('#connection').textContent='◌ Đang kết nối lại…';keys.clear();pressed.clear();skillTaps.clear();});
  const joined=await emit('join',{code,team,spectator,rosterId});didJoin=true;updateRoom(joined.room);sessionStorage.setItem(isHost?'mila-host-room':'mila-player-room',JSON.stringify({code,team,spectator,mode:joined.room.mode}));
 }
@@ -124,8 +131,43 @@ bind('hostStart',async()=>{await emit('mc',{action:room?.phase==='ready'?'launch
 bind('pause',()=>emit('mc',{action:'pause'}));bind('endMatch',()=>modal('<h2>Kết thúc trận?</h2><p>Trận sẽ chốt điểm hiện tại và lưu kết quả.</p><button id="confirmEnd" class="primary">Kết thúc & lưu điểm</button>'));
 document.addEventListener('click',run(async e=>{if(e.target.id==='confirmEnd'){await emit('mc',{action:'finish'});closeModal();toast('Đã lưu kết quả trận.');}}));
 bind('addBots',async()=>{await emit('mc',{action:'bots'});toast('Đã điền người máy vào chỗ trống.');});
-bind('members',()=>{if(!room)throw Error('Tạo phòng trước.');modal('<h2>Thành viên & duyệt vào phòng</h2><p>Duyệt người vào phòng và đặt danh sách tên cho từng đội.</p>'+room.teams.slice(0,isVersus(room.mode)?2:4).map((t,i)=>`<h3>${esc(t)}</h3><div class="team-people">${Array.from({length:teamSize(room.mode)},(_,j)=>{const p=room.players.filter(p=>p.team===i)[j],row=room.roster?.filter(p=>p.team===i)[j];return`<label><input data-roster-team="${i}" data-roster-id="${row?.id||''}" placeholder="Thành viên ${j+1}" value="${esc(row?.name||p?.rosterName||p?.name||'')}">${p?`<small>${esc(p.name)} · ${p.approved?'✓ Đã duyệt':`<button data-approve="${p.id}">Duyệt</button>`}</small>`:''}</label>`;}).join('')}</div>`).join('')+'<button id="saveRoster" class="primary">Lưu danh sách tên</button>');});
-document.addEventListener('click',run(async e=>{const b=e.target.closest('[data-approve]');if(b){await emit('mc',{action:'approve',id:b.dataset.approve});b.disabled=true;b.textContent='Đã duyệt';}if(e.target.id==='saveRoster'){const rows=$$('[data-roster-team]').filter(i=>i.value.trim()).map(i=>({name:i.value,team:+i.dataset.rosterTeam,...(i.dataset.rosterId?{id:i.dataset.rosterId}:{})}));await emit('mc',{action:'roster',rows});closeModal();toast('Đã lưu danh sách thành viên.');}}));
+function showMembers(){
+ if(!room)throw Error('Tạo phòng trước.');
+ const teams=room.teams.slice(0,isVersus(room.mode)?2:4);
+ modal('<h2>Thành viên phòng</h2><p>Duyệt hoặc đuổi người chơi theo từng đội.</p>'+teams.map((team,i)=>{
+  const players=room.players.filter(p=>p.team===i),roster=(room.roster||[]).filter(row=>row.team===i);
+  const rows=Array.from({length:teamSize(room.mode)},(_,j)=>{
+   const row=roster[j];
+   return `<label><input data-roster-team="${i}" data-roster-id="${esc(row?.id||'')}" placeholder="Thành viên ${j+1}" value="${esc(row?.name||players[j]?.name||'')}"></label>`;
+  });
+  const members=players.map(p=>`<li><span>${esc(p.name)}${p.bot?' · Máy':''}</span>
+   ${p.approved?'':`<button type="button" data-approve="${esc(p.id)}">Duyệt</button>`}
+   ${p.bot?'':`<button type="button" data-kick="${esc(p.id)}">Đuổi</button>`}</li>`);
+  return `<h3>${esc(team)}</h3><ul class="room-members">${members.join('')}</ul>`+
+   (room.phase==='lobby'?`<div class="team-people">${rows.join('')}</div>`:'');
+ }).join('')+(room.phase==='lobby'?'<button id="saveRoster" class="primary">Lưu danh sách tên</button>':''));
+}
+bind('members',showMembers);
+document.addEventListener('click',run(async e=>{
+ const approve=e.target.closest('[data-approve]'),kick=e.target.closest('[data-kick]');
+ if(approve){
+  await emit('mc',{action:'approve',id:approve.dataset.approve});
+  approve.disabled=true;approve.textContent='Đã duyệt';
+ }else if(kick){
+  const player=room?.players.find(p=>p.id===kick.dataset.kick);
+  if(!player)throw Error('Người chơi này đã rời phòng.');
+  if(!window.confirm('Đuổi '+player.name+' khỏi phòng này?'))return;
+  kick.disabled=true;
+  try{
+   await emit('mc',{action:'kick',id:player.id});
+   if(room?.phase==='lobby')kick.closest('li')?.remove();else showMembers();
+   toast('Đã đuổi '+player.name+' khỏi phòng.');
+  }finally{kick.disabled=false;}
+ }else if(e.target.id==='saveRoster'){
+  const rows=$$('[data-roster-team]').filter(i=>i.value.trim()).map(i=>({name:i.value,team:+i.dataset.rosterTeam,...(i.dataset.rosterId?{id:i.dataset.rosterId}:{})}));
+  await emit('mc',{action:'roster',rows});closeModal();toast('Đã lưu danh sách thành viên.');
+ }
+}));
 function chooseObserverMode(next){
  cameraMode=next;const pair=nextPair(),chosen=$('#watchPlayer')?.value;
  if(['teamA','teamB'].includes(next))arena.camera('team',pair[next==='teamA'?0:1]);

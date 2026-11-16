@@ -13,5 +13,34 @@ test('Render HTTP protocol, password gate, guest restrictions and SQLite restart
  assert.equal((await api('/api/host',{password:'wrong'})).status,401);const host=(await api('/api/host',{password:'node-test-password'})).body;assert.ok(host.token);
  const guest=(await api('/api/guest',{nickname:'Bông'})).body;assert.equal((await api('/api/rooms',{},guest.token)).status,403);const room=(await api('/api/rooms',{mode:'duel'},host.token)).body;const route='/api/live/'+room.code;
  await api(route+'/join',{team:0},guest.token);await api(route+'/mc',{action:'approve',id:guest.id},host.token);await api(route+'/mc',{action:'bots'},host.token);assert.equal((await api(route+'/mc',{action:'start'},host.token)).body.room.phase,'select');await api(route+'/selectHero',{hero:'luna'},guest.token);assert.equal((await api(route+'/poll',{},guest.token)).body.room.phase,'ready');await api(route+'/mc',{action:'launch'},host.token);assert.equal((await api(route+'/mc',{action:'finish'},host.token)).body.room.phase,'finished');await api(route+'/mc',{action:'replay'},host.token);
- const changed=(await api('/api/host/password',{currentPassword:'node-test-password',newPassword:'node-new-password'},host.token)).body;await stop();await launch();assert.equal((await api('/api/host',{password:'node-test-password'})).status,401);const resumed=(await api('/api/host',{password:'node-new-password'})).body;assert.equal((await api('/api/archives/'+room.code,null,resumed.token)).body.length,1);assert.equal((await api('/api/rooms',null,changed.token)).body[0].code,room.code);
+ const lobbyRoom=(await api('/api/rooms',{mode:'duel'},host.token)).body,lobbyRoute='/api/live/'+lobbyRoom.code;
+ const unknown=(await api('/api/guest',{nickname:'Người lạ'})).body;
+ assert.equal((await api(lobbyRoute+'/join',{team:0},unknown.token)).status,200);
+ assert.equal((await api(lobbyRoute+'/mc',{action:'kick',id:unknown.id},guest.token)).status,400);
+ const kicked=await api(lobbyRoute+'/mc',{action:'kick',id:unknown.id},host.token);
+ assert.equal(kicked.status,200);
+ assert.equal(kicked.body.room.players.some(p=>p.id===unknown.id),false);
+ assert.equal(kicked.body.room.kicked,undefined);
+ const rejected=await api(lobbyRoute+'/poll',{input:{a1:true}},unknown.token);
+ assert.equal(rejected.status,403);
+ assert.equal(rejected.body.code,'room_kicked');
+ assert.equal((await api(lobbyRoute+'/join',{spectator:true},unknown.token)).status,403);
+ const renamedSession=(await api('/api/guest',{nickname:'NGƯỜI LẠ'})).body;
+ assert.equal((await api(lobbyRoute+'/join',{team:0},renamedSession.token)).status,403);
+
+ const battleRoom=(await api('/api/rooms',{mode:'duel'},host.token)).body,battleRoute='/api/live/'+battleRoom.code;
+ await api(battleRoute+'/join',{team:0},unknown.token);
+ await api(battleRoute+'/mc',{action:'bots'},host.token);
+ await api(battleRoute+'/mc',{action:'start'},host.token);
+ await api(battleRoute+'/selectHero',{hero:'luna'},unknown.token);
+ await api(battleRoute+'/poll',{},host.token);
+ const launched=await api(battleRoute+'/mc',{action:'launch'},host.token);
+ assert.equal(launched.body.room.phase,'battle');
+ const replaced=await api(battleRoute+'/mc',{action:'kick',id:unknown.id},host.token);
+ assert.equal(replaced.body.room.phase,'battle');
+ assert.equal(replaced.body.match.players.length,2);
+ assert.ok(replaced.body.match.players.every(p=>p.bot&&p.id!==unknown.id));
+ assert.equal((await api(battleRoute+'/chat',{text:'Xin chào'},unknown.token)).status,403);
+
+ const changed=(await api('/api/host/password',{currentPassword:'node-test-password',newPassword:'node-new-password'},host.token)).body;await stop();await launch();assert.equal((await api('/api/host',{password:'node-test-password'})).status,401);const resumed=(await api('/api/host',{password:'node-new-password'})).body;assert.equal((await api('/api/archives/'+room.code,null,resumed.token)).body.length,1);assert.equal((await api('/api/rooms',null,changed.token)).body.some(r=>r.code===room.code),true);
 });

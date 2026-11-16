@@ -5,7 +5,7 @@ export function makeSocket(options){
  const handlers=new Map();let native=null,code=null,latest={},timer=null,closed=false,busy=false,phase=null,lastUI=null,lastQuiz=null,lastChats=new Set(),failed=false;
  const pendingTaps=new Set(),tapExpires=new Map();
  const fire=(event,data)=>{for(const fn of handlers.get(event)||[])fn(data);};
- const request=async(path,body)=>{const res=await fetch(apiUrl(path),{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+options.auth.token},body:JSON.stringify(body||{})});const value=await res.json();if(!res.ok)throw Error(value.error||'Không kết nối được phòng.');return value;};
+ const request=async(path,body)=>{const res=await fetch(apiUrl(path),{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+options.auth.token},body:JSON.stringify(body||{})});const value=await res.json();if(!res.ok)throw Object.assign(new Error(value.error||'Không kết nối được phòng.'),{code:value.code});return value;};
  const apply=p=>{if(p.room)phase=p.room.phase;if(p.room&&lastUI!==p.room.uiVersion){lastUI=p.room.uiVersion;fire('room',p.room);}if(p.match)fire('match',p.match);if(p.question){const key=p.question.index+':'+p.question.at+':'+p.question.reason;if(key!==lastQuiz){lastQuiz=key;fire('question',p.question);}}for(const chat of p.chats||[])if(!lastChats.has(chat.seq)){lastChats.add(chat.seq);fire('chat',chat);}if(lastChats.size>150)lastChats=new Set((p.chats||[]).map(c=>c.seq));};
  const poll=async()=>{if(closed||busy||!code)return;busy=true;const started=performance.now();try{// Keep a quick tap visible across at least one server simulation tick.
   for(const skill of pendingTaps)tapExpires.set(skill,started+220);
@@ -15,7 +15,9 @@ export function makeSocket(options){
    if(started<expires)input['a'+skill]=true;
    else tapExpires.delete(skill);
   }
-  const p=await request('/api/live/'+code+'/poll',{input});apply(p);if(failed){failed=false;fire('connect');}}catch(e){pendingTaps.clear();tapExpires.clear();if(!failed){failed=true;fire('disconnect');}}finally{
+  const p=await request('/api/live/'+code+'/poll',{input});apply(p);if(failed){failed=false;fire('connect');}}catch(e){pendingTaps.clear();tapExpires.clear();
+  if(e.code==='room_kicked'){closed=true;fire('kicked',e.message);return;}
+  if(!failed){failed=true;fire('disconnect');}}finally{
   busy=false;
   if(!closed){
    const interval=failed?800:phase==='battle'?120:phase==='select'||phase==='ready'?250:500;
